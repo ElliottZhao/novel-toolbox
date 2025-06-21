@@ -25,12 +25,12 @@ export async function handleFetchBookContent(job: Job<FetchBookContentData>, pri
   const chaptersToFetch = await prisma.chapter.findMany({
     where: {
       bookId: bookId,
-      content: '',
+      downloaded: false,
       fanqie_chapter_id: {
         not: null,
       },
     },
-    take: 1,
+    take: 10,
   });
 
   if (chaptersToFetch.length === 0) {
@@ -60,7 +60,6 @@ export async function handleFetchBookContent(job: Job<FetchBookContentData>, pri
       const isLocked = initialState?.reader?.chapterData?.isChapterLock || false;
       if (isLocked) {
         console.log(`Chapter ${chapter.id} is locked. Retrying with session.`);
-        // This session ID might need to be configurable in the future.
         const sessionCookie = 'sessionid=07b34d642ef635f351b8d3ec62b1f565';
         pageContent = await fetchPage(url, sessionCookie);
         initialState = extractInitialState(pageContent);
@@ -72,14 +71,26 @@ export async function handleFetchBookContent(job: Job<FetchBookContentData>, pri
         continue;
       }
       
-      const finalContent = parseChapterContent(rawHtmlContent);
+      const paragraphs = parseChapterContent(rawHtmlContent);
 
-      if (finalContent) {
-        await prisma.chapter.update({
-          where: { id: chapter.id },
-          data: { content: finalContent },
-        });
-        console.log(`Successfully updated content for chapter ${chapter.id}`);
+      if (paragraphs.length > 0) {
+        const paragraphData = paragraphs.map((p, index) => ({
+          text: p,
+          order: index + 1,
+          chapterId: chapter.id,
+        }));
+
+        await prisma.$transaction([
+          prisma.paragraph.createMany({
+            data: paragraphData,
+          }),
+          prisma.chapter.update({
+            where: { id: chapter.id },
+            data: { downloaded: true },
+          }),
+        ]);
+
+        console.log(`Successfully saved ${paragraphs.length} paragraphs for chapter ${chapter.id} and marked as downloaded.`);
       } else {
         console.log(`Extracted content was empty for chapter ${chapter.id}.`);
       }

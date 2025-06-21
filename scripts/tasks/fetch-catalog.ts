@@ -30,8 +30,6 @@ export async function handleFetchCatalog(job: Job<FetchCatalogData>, prisma: Pri
   const initialState = extractInitialState(content)
 
   if (initialState) {
-    console.log('Successfully extracted __INITIAL_STATE__. Keys:', Object.keys(initialState))
-
     // Update book title and author
     const bookName = initialState?.page?.bookName
     const authorName = initialState?.page?.authorName
@@ -52,7 +50,6 @@ export async function handleFetchCatalog(job: Job<FetchCatalogData>, prisma: Pri
           title: chapter.title,
           fanqie_chapter_id: chapter.itemId.toString(),
           volume: chapter.volume_name,
-          content: '',
           bookId: bookId,
         }))
 

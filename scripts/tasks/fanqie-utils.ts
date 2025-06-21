@@ -73,24 +73,33 @@ function getCharacterMap(): Record<string, string> {
 
 /**
  * Parses the chapter's HTML content, de-obfuscates it using the character map,
- * and returns the clean text.
+ * and returns an array of paragraphs.
  * @param htmlContent The raw HTML of the chapter content.
- * @returns The clean chapter text.
+ * @returns An array of strings, where each string is a de-obfuscated paragraph.
  */
-export function parseChapterContent(htmlContent: string): string {
+export function parseChapterContent(htmlContent: string): string[] {
   const charMap = getCharacterMap()
   if (Object.keys(charMap).length === 0) {
     console.warn("Character map is empty, returning raw content.")
     // Fallback to just extracting text if map is missing
     const $ = load(htmlContent)
-    return $('p').text()
+    const paragraphs: string[] = []
+    $('p').each((_, p) => {
+      const pText = $(p).text().trim()
+      if (pText) {
+        paragraphs.push(pText)
+      }
+    })
+    return paragraphs
   }
 
   const $ = load(htmlContent)
 
   const paragraphs: string[] = []
   $('p').each((_, p) => {
-    let pText = $(p).text()
+    const pText = $(p).text().trim()
+    if (!pText) return // Skip empty paragraphs
+
     let deobfuscatedText = ''
     for (const char of pText) {
       const charCode = char.charCodeAt(0).toString()
@@ -99,5 +108,5 @@ export function parseChapterContent(htmlContent: string): string {
     paragraphs.push(deobfuscatedText)
   })
 
-  return paragraphs.join('\n\n')
+  return paragraphs
 }

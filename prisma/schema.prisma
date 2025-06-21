@@ -35,7 +35,7 @@ model Chapter {
   title             String
   volume            String?
   fanqie_chapter_id String?   @unique
-  content           String    @default("") // To store the chapter's text content for analysis.
+  downloaded        Boolean   @default(false)
   status            ChapterStatus @default(UNANALYZED)
   addedAt           DateTime  @default(now())
 
@@ -43,9 +43,22 @@ model Chapter {
   book      Book      @relation(fields: [bookId], references: [id], onDelete: Cascade)
 
   analysisResult AnalysisResult?
+  paragraphs     Paragraph[]
 
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
+}
+
+model Paragraph {
+  id        Int      @id @default(autoincrement())
+  text      String   @db.Text
+  order     Int
+  chapterId Int
+  chapter   Chapter  @relation(fields: [chapterId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([chapterId, order])
 }
 
 // 5. Define the AnalysisResult model.
