@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { IconBook, IconBookFilled } from "@tabler/icons-react";
+import { IconBook, IconBookFilled, IconFile } from "@tabler/icons-react";
 
 import { NavMain } from "@/components/nav-main";
 import {
@@ -20,6 +20,11 @@ const data = {
       url: "/books",
       icon: IconBook,
     },
+    {
+      title: "任务队列",
+      url: "/tasks",
+      icon: IconFile,
+    }
   ],
 };
 
