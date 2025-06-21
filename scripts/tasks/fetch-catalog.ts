@@ -1,6 +1,6 @@
 import { Job } from 'bullmq'
 import { PrismaClient } from '@/app/generated/prisma'
-import { extractInitialState } from '../utils'
+import { extractInitialState } from './fanqie-utils'
 import type { FetchCatalogData } from '../worker'
 
 export async function handleFetchCatalog(job: Job<FetchCatalogData>, prisma: PrismaClient) {
