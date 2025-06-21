@@ -1,10 +1,17 @@
 // scripts/worker.ts
 import { Worker, Job } from 'bullmq';
 import IORedis from 'ioredis';
-import { FETCH_CATALOG_TASK, FETCH_BOOK_CONTENT_TASK } from '@/lib/tasks';
+import {
+  FETCH_CATALOG_TASK,
+  FETCH_BOOK_CONTENT_TASK,
+  FETCH_SINGLE_CHAPTER_CONTENT_TASK,
+} from '@/lib/tasks';
 import { PrismaClient } from '@/app/generated/prisma';
 import { handleFetchCatalog } from './tasks/fetch-catalog';
-import { handleFetchBookContent } from './tasks/fetch-book-content';
+import {
+  handleFetchBookContent,
+  handleFetchSingleChapterContent,
+} from './tasks/fetch-book-content';
 
 const prisma = new PrismaClient();
 const connection = new IORedis(process.env.REDIS_URL || 'redis://127.0.0.1:6379', {
@@ -16,21 +23,25 @@ interface BaseTaskData {
 }
 export interface FetchCatalogData extends BaseTaskData {}
 export interface FetchBookContentData extends BaseTaskData {}
+export interface FetchSingleChapterContentData {
+  chapterId: number;
+}
 
-export type TaskData = FetchCatalogData | FetchBookContentData;
+export type TaskData =
+  | FetchCatalogData
+  | FetchBookContentData
+  | FetchSingleChapterContentData;
 
 console.log('Worker starting...');
 
 const worker = new Worker<TaskData>(
   'tasks',
   async (job: Job<TaskData>) => {
-    console.log(`Processing job ${job.id} of type ${job.name} with data:`, job.data);
-    const bookId = Number(job.data.bookId);
-
-    if (isNaN(bookId)) {
-      throw new Error(`Invalid bookId: ${job.data.bookId}`);
-    }
-
+    console.log(
+      `Processing job ${job.id} of type ${job.name} with data:`,
+      job.data,
+    );
+    
     switch (job.name) {
       case FETCH_CATALOG_TASK: {
         await handleFetchCatalog(job as Job<FetchCatalogData>, prisma);
@@ -38,6 +49,13 @@ const worker = new Worker<TaskData>(
       }
       case FETCH_BOOK_CONTENT_TASK: {
         await handleFetchBookContent(job as Job<FetchBookContentData>, prisma);
+        break;
+      }
+      case FETCH_SINGLE_CHAPTER_CONTENT_TASK: {
+        await handleFetchSingleChapterContent(
+          job as Job<FetchSingleChapterContentData>,
+          prisma,
+        );
         break;
       }
       default:

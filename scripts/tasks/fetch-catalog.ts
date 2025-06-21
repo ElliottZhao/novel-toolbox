@@ -41,57 +41,63 @@ export async function handleFetchCatalog(job: Job<FetchCatalogData>, prisma: Pri
       console.log(`Updated book title to "${bookName}" and author to "${authorName}".`)
     }
 
-    const chapterListWithVolume: any[][] = initialState?.page?.chapterListWithVolume
+    const chapterListWithVolume: any[] = initialState?.page?.chapterListWithVolume
     if (Array.isArray(chapterListWithVolume)) {
-      const incomingChapters = chapterListWithVolume
-        .flat()
-        .filter((chapter) => chapter && chapter.itemId && chapter.title)
-        .map((chapter) => ({
-          title: chapter.title,
-          fanqie_chapter_id: chapter.itemId.toString(),
-          volume: chapter.volume_name,
-          bookId: bookId,
-        }))
+      const existingChapters = await prisma.chapter.findMany({
+        where: { bookId: bookId },
+        select: { fanqie_chapter_id: true },
+      })
+      const existingFanqieIds = new Set(
+        existingChapters.map((c) => c.fanqie_chapter_id),
+      )
 
-      if (incomingChapters.length > 0) {
-        console.log(
-          'First chapter data sample:',
-          JSON.stringify(incomingChapters[0], null, 2)
-        )
+      let newChaptersCount = 0
+      for (const [volumeIndex, volumeData] of chapterListWithVolume.entries()) {
+        const volumeName = volumeData?.[0]?.volume_name
+        if (!volumeName) continue
+        const volume = await prisma.volume.upsert({
+          where: { bookId_title: { bookId: bookId, title: volumeName } },
+          update: {},
+          create: {
+            bookId: bookId,
+            title: volumeName,
+            index: volumeIndex,
+          },
+        })
 
-        const existingFanqieIds = (
-          await prisma.chapter.findMany({
-            where: {
-              fanqie_chapter_id: {
-                in: incomingChapters.map((c) => c.fanqie_chapter_id as string),
+        if (Array.isArray(volumeData)) {
+          for (const [chapterIndex, chapterData] of volumeData.entries()) {
+            if (
+              !chapterData ||
+              !chapterData.itemId ||
+              existingFanqieIds.has(chapterData.itemId.toString())
+            ) {
+              continue
+            }
+
+            await prisma.chapter.create({
+              data: {
+                bookId: bookId,
+                volumeId: volume.id,
+                title: chapterData.title,
+                index: chapterIndex,
+                fanqie_chapter_id: chapterData.itemId.toString(),
               },
-              bookId: bookId,
-            },
-            select: {
-              fanqie_chapter_id: true,
-            },
-          })
-        ).map((c) => c.fanqie_chapter_id)
-
-        const newChapters = incomingChapters.filter(
-          (c) => c.fanqie_chapter_id && !existingFanqieIds.includes(c.fanqie_chapter_id)
-        )
-
-        if (newChapters.length > 0) {
-          console.log(`Found ${newChapters.length} new chapters to save.`)
-          const result = await prisma.chapter.createMany({
-            data: newChapters,
-            skipDuplicates: true,
-          })
-          console.log(
-            `Successfully created ${result.count} new chapters in the database.`
-          )
-        } else {
-          console.log('No new chapters to save.')
+            })
+            newChaptersCount++
+            existingFanqieIds.add(chapterData.itemId.toString())
+          }
         }
       }
+      if (newChaptersCount > 0) {
+        console.log(
+          `Successfully created ${newChaptersCount} new chapters in the database.`,
+        )
+      } else {
+        console.log("No new chapters to save.")
+      }
     } else {
-      console.warn('Could not find chapterListWithVolume in __INITIAL_STATE__')
+      console.warn("Could not find chapterListWithVolume in __INITIAL_STATE__")
     }
   } else {
     console.warn('Could not find or process __INITIAL_STATE__')

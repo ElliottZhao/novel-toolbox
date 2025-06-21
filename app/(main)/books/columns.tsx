@@ -1,6 +1,7 @@
 "use client"
 
 import { ColumnDef } from "@tanstack/react-table"
+import Link from "next/link"
 import { Book } from "@/lib/schemas"
 import { MoreHorizontal, ArrowUpDown } from "lucide-react"
 
@@ -28,6 +29,14 @@ export const columns = (onAction: (bookId: string, taskType: string) => void): C
           标题
           <ArrowUpDown className="ml-2 h-4 w-4" />
         </Button>
+      )
+    },
+    cell: ({ row }) => {
+      const book = row.original
+      return (
+        <Link href={`/chapters?bookId=${book.id}`} className="hover:underline">
+          {book.title}
+        </Link>
       )
     },
   },

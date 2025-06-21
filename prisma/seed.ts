@@ -4,12 +4,6 @@ const prisma = new PrismaClient()
 async function main() {
   console.log(`Start seeding ...`)
 
-  // Clean up existing data
-  await prisma.chapter.deleteMany({})
-  await prisma.analysisResult.deleteMany({})
-  await prisma.book.deleteMany({})
-  console.log("Deleted previous data.")
-
   console.log(`Seeding finished.`)
 }
 

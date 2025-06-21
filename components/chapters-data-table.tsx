@@ -1,14 +1,15 @@
 "use client"
 
 import * as React from "react"
+import Link from "next/link"
 import {
   IconChevronDown,
   IconChevronLeft,
   IconChevronRight,
   IconChevronsLeft,
   IconChevronsRight,
-  IconCircleCheckFilled,
   IconDotsVertical,
+  IconDownload,
   IconLayoutColumns,
   IconLoader,
   IconPlus,
@@ -23,28 +24,17 @@ import {
   getFilteredRowModel,
   getPaginationRowModel,
   getSortedRowModel,
-  Row,
   SortingState,
   useReactTable,
   VisibilityState,
 } from "@tanstack/react-table"
 import { z } from "zod"
-import { useQuery } from "@tanstack/react-query"
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
+import { toast } from "sonner"
 
-import { useIsMobile } from "@/hooks/use-mobile"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Checkbox } from "@/components/ui/checkbox"
-import {
-  Drawer,
-  DrawerClose,
-  DrawerContent,
-  DrawerDescription,
-  DrawerFooter,
-  DrawerHeader,
-  DrawerTitle,
-  DrawerTrigger,
-} from "@/components/ui/drawer"
 import {
   DropdownMenu,
   DropdownMenuCheckboxItem,
@@ -53,7 +43,6 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
-import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import {
   Select,
@@ -77,9 +66,11 @@ import {
   TabsTrigger,
 } from "@/components/ui/tabs"
 import { Chapter, chapterSchema } from "@/lib/schemas"
+import { cn } from "@/lib/utils"
 
-async function getChapters(): Promise<Chapter[]> {
-  const response = await fetch("/api/chapters")
+async function getChapters(bookId?: number): Promise<Chapter[]> {
+  const url = bookId ? `/api/chapters?bookId=${bookId}` : "/api/chapters"
+  const response = await fetch(url)
   if (!response.ok) {
     throw new Error("Network response was not ok")
   }
@@ -87,7 +78,26 @@ async function getChapters(): Promise<Chapter[]> {
   return z.array(chapterSchema).parse(data)
 }
 
-const columns: ColumnDef<Chapter>[] = [
+async function downloadChapter(chapterId: number) {
+  const response = await fetch(`/api/chapters/${chapterId}/download`, {
+    method: "POST",
+  })
+
+  if (!response.ok) {
+    const errorData = await response.json()
+    throw new Error(errorData.error || "Failed to schedule download task")
+  }
+
+  return response.json()
+}
+
+type DownloadFunction = (chapterId: number) => void
+
+const getColumns = (
+  downloadChapter: DownloadFunction,
+  isPending: boolean,
+  pendingChapterId?: number,
+): ColumnDef<Chapter>[] => [
   {
     id: "select",
     header: ({ table }) => (
@@ -120,14 +130,22 @@ const columns: ColumnDef<Chapter>[] = [
     header: "书名",
   },
   {
-    accessorKey: "volume",
+    accessorFn: (row) => row.volume?.title,
+    id: "volume",
     header: "分卷名",
   },
   {
     accessorKey: "title",
     header: "章节名",
     cell: ({ row }) => {
-      return <TableCellViewer item={row.original} />
+      return (
+        <Link
+          href={`/chapters/${row.original.id}`}
+          className="hover:underline"
+        >
+          {row.original.title}
+        </Link>
+      )
     },
     enableHiding: false,
   },
@@ -143,18 +161,38 @@ const columns: ColumnDef<Chapter>[] = [
     accessorKey: "status",
     header: "状态",
     cell: ({ row }) => {
-      const status: "ANALYZED" | "UNANALYZED" = row.getValue("status")
+      const status = row.original.status
+      if (status === "EMPTY") {
+        const isLoading = isPending && pendingChapterId === row.original.id
+        return (
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => downloadChapter(row.original.id)}
+            disabled={isLoading}
+          >
+            {isLoading ? (
+              <IconLoader className="mr-2 h-4 w-4 animate-spin" />
+            ) : (
+              <IconDownload className="mr-2 h-4 w-4" />
+            )}
+            EMPTY
+          </Button>
+        )
+      }
+
+      const variant =
+        status === "ANALYZED"
+          ? "default"
+          : status === "UNANALYZED"
+          ? "secondary"
+          : "outline"
       return (
         <Badge
-          variant="outline"
-          className="text-muted-foreground whitespace-nowrap px-1.5"
+          variant={variant}
+          className={cn(status === "ANALYZED" && "bg-green-600 text-white")}
         >
-          {status === "ANALYZED" ? (
-            <IconCircleCheckFilled className="fill-green-500 dark:fill-green-400" />
-          ) : (
-            <IconLoader />
-          )}
-          {status === "ANALYZED" ? "已分析" : "未分析"}
+          {status}
         </Badge>
       )
     },
@@ -185,16 +223,39 @@ const columns: ColumnDef<Chapter>[] = [
   },
 ]
 
-export function DataTable() {
+export function ChaptersDataTable({ bookId }: { bookId?: number }) {
+  const queryClient = useQueryClient()
+
+  const downloadMutation = useMutation<unknown, Error, number>({
+    mutationFn: downloadChapter,
+    onSuccess: () => {
+      toast.success("章节下载任务已加入队列。")
+      queryClient.invalidateQueries({ queryKey: ["chapters", bookId] })
+    },
+    onError: (error) => {
+      toast.error(`任务创建失败: ${error.message}`)
+    },
+  })
+
+  const columns = React.useMemo(
+    () =>
+      getColumns(
+        downloadMutation.mutate,
+        downloadMutation.isPending,
+        downloadMutation.variables,
+      ),
+    [downloadMutation.isPending, downloadMutation.variables],
+  )
+
   const { data = [], isLoading } = useQuery({
-    queryKey: ["chapters"],
-    queryFn: getChapters,
+    queryKey: ["chapters", bookId],
+    queryFn: () => getChapters(bookId),
   })
   const [rowSelection, setRowSelection] = React.useState({})
   const [columnVisibility, setColumnVisibility] =
     React.useState<VisibilityState>({})
   const [columnFilters, setColumnFilters] = React.useState<ColumnFiltersState>(
-    []
+    [],
   )
   const [sorting, setSorting] = React.useState<SortingState>([])
   const [pagination, setPagination] = React.useState({
@@ -203,15 +264,11 @@ export function DataTable() {
   })
 
   const { analyzedCount, unanalyzedCount, totalCount } = React.useMemo(() => {
-    console.log("Data for counting:", data)
     const analyzed = data.filter((c) => c.status === "ANALYZED").length
-    const unanalyzed = data.filter((c) => c.status === "UNANALYZED").length
+    const unanalyzed = data.filter(
+      (c) => c.status === "UNANALYZED" || c.status === "EMPTY",
+    ).length
     const total = data.length
-    console.log("Calculated counts:", {
-      analyzed,
-      unanalyzed,
-      total,
-    })
     return {
       analyzedCount: analyzed,
       unanalyzedCount: unanalyzed,
@@ -219,26 +276,28 @@ export function DataTable() {
     }
   }, [data])
 
-  const [currentView, setCurrentView] = React.useState("all-chapters")
+  const [activeTab, setActiveTab] = React.useState("all-chapters")
 
-  const handleViewChange = (view: string) => {
-    setCurrentView(view)
-    if (view === "all-chapters") {
-      setColumnFilters([])
-    } else {
-      const filterValue = view === "analyzed" ? "ANALYZED" : "UNANALYZED"
-      setColumnFilters([{ id: "status", value: filterValue }])
+  const filteredData = React.useMemo(() => {
+    if (activeTab === "analyzed") {
+      return data.filter((item) => item.status === "ANALYZED")
     }
-  }
+    if (activeTab === "unanalyzed") {
+      return data.filter(
+        (item) => item.status === "UNANALYZED" || item.status === "EMPTY",
+      )
+    }
+    return data
+  }, [data, activeTab])
 
   const table = useReactTable({
-    data,
+    data: filteredData,
     columns,
     state: {
       sorting,
       columnVisibility,
-      rowSelection,
       columnFilters,
+      rowSelection,
       pagination,
     },
     getRowId: (row) => row.id.toString(),
@@ -270,7 +329,7 @@ export function DataTable() {
                         ? null
                         : flexRender(
                             header.column.columnDef.header,
-                            header.getContext()
+                            header.getContext(),
                           )}
                     </TableHead>
                   )
@@ -300,7 +359,7 @@ export function DataTable() {
                     <TableCell key={cell.id}>
                       {flexRender(
                         cell.column.columnDef.cell,
-                        cell.getContext()
+                        cell.getContext(),
                       )}
                     </TableCell>
                   ))}
@@ -401,15 +460,15 @@ export function DataTable() {
 
   return (
     <Tabs
-      value={currentView}
-      onValueChange={handleViewChange}
+      value={activeTab}
+      onValueChange={setActiveTab}
       className="w-full flex-col justify-start gap-6"
     >
       <div className="flex items-center justify-between px-4 lg:px-6">
         <Label htmlFor="view-selector" className="sr-only">
           视图
         </Label>
-        <Select value={currentView} onValueChange={handleViewChange}>
+        <Select value={activeTab} onValueChange={setActiveTab}>
           <SelectTrigger
             className="flex w-fit @4xl/main:hidden"
             size="sm"
@@ -452,7 +511,7 @@ export function DataTable() {
                 .filter(
                   (column) =>
                     typeof column.accessorFn !== "undefined" &&
-                    column.getCanHide()
+                    column.getCanHide(),
                 )
                 .map((column) => {
                   return (
@@ -464,7 +523,6 @@ export function DataTable() {
                         column.toggleVisibility(!!value)
                       }
                     >
-                      {/* A simple transformation for better readability */}
                       {
                         {
                           bookTitle: "书名",
@@ -488,72 +546,5 @@ export function DataTable() {
       <TabsContent value="unanalyzed">{tableContent}</TabsContent>
       <TabsContent value="analyzed">{tableContent}</TabsContent>
     </Tabs>
-  )
-}
-
-function TableCellViewer({ item }: { item: Chapter }) {
-  const isMobile = useIsMobile()
-
-  return (
-    <Drawer direction={isMobile ? "bottom" : "right"}>
-      <DrawerTrigger asChild>
-        <Button variant="link" className="text-foreground w-fit px-0 text-left">
-          {item.title}
-        </Button>
-      </DrawerTrigger>
-      <DrawerContent>
-        <DrawerHeader className="gap-1">
-          <DrawerTitle>{item.title}</DrawerTitle>
-          <DrawerDescription>
-            {item.book?.title} - {item.volume}
-          </DrawerDescription>
-        </DrawerHeader>
-        <div className="flex flex-col gap-4 overflow-y-auto px-4 text-sm">
-          <form className="flex flex-col gap-4">
-            <div className="flex flex-col gap-3">
-              <Label htmlFor="bookTitle">书名</Label>
-              <Input id="bookTitle" defaultValue={item.book?.title} />
-            </div>
-            <div className="flex flex-col gap-3">
-              <Label htmlFor="volumeName">分卷名</Label>
-              <Input id="volumeName" defaultValue={item.volume ?? ""} />
-            </div>
-            <div className="flex flex-col gap-3">
-              <Label htmlFor="chapterName">章节名</Label>
-              <Input id="chapterName" defaultValue={item.title} />
-            </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div className="flex flex-col gap-3">
-                <Label htmlFor="dateAdded">入库时间</Label>
-                <Input
-                  id="dateAdded"
-                  defaultValue={new Date(item.addedAt).toLocaleDateString(
-                    "zh-CN"
-                  )}
-                />
-              </div>
-              <div className="flex flex-col gap-3">
-                <Label htmlFor="status">状态</Label>
-                <Select defaultValue={item.status}>
-                  <SelectTrigger id="status" className="w-full">
-                    <SelectValue placeholder="选择状态" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="ANALYZED">已分析</SelectItem>
-                    <SelectItem value="UNANALYZED">未分析</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-          </form>
-        </div>
-        <DrawerFooter>
-          <Button>提交</Button>
-          <DrawerClose asChild>
-            <Button variant="outline">完成</Button>
-          </DrawerClose>
-        </DrawerFooter>
-      </DrawerContent>
-    </Drawer>
   )
 }

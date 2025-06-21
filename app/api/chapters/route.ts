@@ -5,9 +5,9 @@ import { z } from "zod"
 
 const createChapterSchema = z.object({
   title: z.string().min(1, "Title is required."),
-  volume: z.string().optional(),
-  content: z.string().min(1, "Content is required."),
   bookId: z.number().int().positive("A valid book ID is required."),
+  volumeId: z.number().int().positive("A valid volume ID is required."),
+  index: z.number().int(),
 })
 
 export async function GET(request: Request) {
@@ -20,13 +20,32 @@ export async function GET(request: Request) {
       include: {
         book: {
           select: {
+            id: true,
             title: true,
+            author: true,
+            fanqie_book_id: true,
+            status: true,
+          },
+        },
+        volume: {
+          select: {
+            id: true,
+            title: true,
+            index: true,
+            bookId: true,
           },
         },
       },
-      orderBy: {
-        addedAt: "desc",
-      },
+      orderBy: [
+        {
+          volume: {
+            index: "asc",
+          },
+        },
+        {
+          index: "asc",
+        },
+      ],
     })
     return NextResponse.json(chapters)
   } catch (error) {
@@ -46,10 +65,9 @@ export async function POST(request: Request) {
     const newChapter = await prisma.chapter.create({
       data: {
         title: data.title,
-        volume: data.volume,
-        content: data.content,
         bookId: data.bookId,
-        // Default status is UNANALYZED
+        volumeId: data.volumeId,
+        index: data.index,
       },
     })
 

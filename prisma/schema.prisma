@@ -23,8 +23,24 @@ model Book {
   fanqie_book_id String     @unique
   status         BookStatus @default(DRAFT)
   chapters       Chapter[]
+  volumes        Volume[]
   createdAt      DateTime   @default(now())
   updatedAt      DateTime   @updatedAt
+}
+
+model Volume {
+  id      Int       @id @default(autoincrement())
+  title   String
+  index   Int
+  bookId  Int
+  book    Book      @relation(fields: [bookId], references: [id], onDelete: Cascade)
+  chapters Chapter[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([bookId, index])
+  @@unique([bookId, title])
 }
 
 // 4. Define the Chapter model.
@@ -33,14 +49,15 @@ model Book {
 model Chapter {
   id                Int       @id @default(autoincrement())
   title             String
-  volume            String?
+  index             Int
   fanqie_chapter_id String?   @unique
-  downloaded        Boolean   @default(false)
-  status            ChapterStatus @default(UNANALYZED)
+  status            ChapterStatus @default(EMPTY)
   addedAt           DateTime  @default(now())
 
   bookId    Int
   book      Book      @relation(fields: [bookId], references: [id], onDelete: Cascade)
+  volumeId  Int
+  volume    Volume    @relation(fields: [volumeId], references: [id], onDelete: Cascade)
 
   analysisResult AnalysisResult?
   paragraphs     Paragraph[]
@@ -86,6 +103,7 @@ enum BookStatus {
 }
 
 enum ChapterStatus {
+  EMPTY
   UNANALYZED
   ANALYZED
 }
