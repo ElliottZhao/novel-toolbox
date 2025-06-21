@@ -4,8 +4,9 @@ import { z } from "zod"
 
 // Zod schema for book creation
 const createBookSchema = z.object({
-  title: z.string().min(1, "Title is required."),
-  author: z.string().min(1, "Author is required."),
+  title: z.string().optional(),
+  author: z.string().optional(),
+  fanqie_book_id: z.string().min(1, "Fanqie Book ID is required."),
 })
 
 export async function GET() {
@@ -27,12 +28,13 @@ export async function GET() {
 export async function POST(request: Request) {
   try {
     const json = await request.json()
-    const { title, author } = createBookSchema.parse(json)
+    const { title, author, fanqie_book_id } = createBookSchema.parse(json)
 
     const newBook = await prisma.book.create({
       data: {
         title,
         author,
+        fanqie_book_id,
         // Default status is DRAFT as per schema.prisma
       },
     })

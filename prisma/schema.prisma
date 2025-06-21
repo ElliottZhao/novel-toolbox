@@ -17,25 +17,27 @@ datasource db {
 // 3. Define the Book model.
 // This model corresponds to the data in `app/api/books/route.ts`.
 model Book {
-  id        Int       @id @default(autoincrement())
-  title     String    @unique
-  author    String
-  status    BookStatus @default(DRAFT)
-  chapters  Chapter[]
-  createdAt DateTime  @default(now())
-  updatedAt DateTime  @updatedAt
+  id             Int        @id @default(autoincrement())
+  title          String?
+  author         String?
+  fanqie_book_id String     @unique
+  status         BookStatus @default(DRAFT)
+  chapters       Chapter[]
+  createdAt      DateTime   @default(now())
+  updatedAt      DateTime   @updatedAt
 }
 
 // 4. Define the Chapter model.
 // This model corresponds to the data in `app/api/chapters/route.ts`.
 // It includes a relation to the Book model.
 model Chapter {
-  id        Int       @id @default(autoincrement())
-  title     String
-  volume    String?
-  content   String // To store the chapter's text content for analysis.
-  status    ChapterStatus @default(UNANALYZED)
-  addedAt   DateTime  @default(now())
+  id                Int       @id @default(autoincrement())
+  title             String
+  volume            String?
+  fanqie_chapter_id String?   @unique
+  content           String    @default("") // To store the chapter's text content for analysis.
+  status            ChapterStatus @default(UNANALYZED)
+  addedAt           DateTime  @default(now())
 
   bookId    Int
   book      Book      @relation(fields: [bookId], references: [id], onDelete: Cascade)

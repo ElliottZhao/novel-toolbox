@@ -3,8 +3,9 @@ import { z } from "zod"
 // Schema for Book, aligned with Prisma's Book model
 export const bookSchema = z.object({
   id: z.number(),
-  title: z.string(),
-  author: z.string(),
+  title: z.string().nullable(),
+  author: z.string().nullable(),
+  fanqie_book_id: z.string().nullable(),
   status: z.enum(["PUBLISHED", "DRAFT", "ARCHIVED"]),
   createdAt: z.string().datetime(),
   updatedAt: z.string().datetime(),

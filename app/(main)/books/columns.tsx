@@ -10,7 +10,6 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuLabel,
-  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { FETCH_CATALOG_TASK, FETCH_BOOK_CONTENT_TASK } from "@/lib/tasks"
@@ -26,7 +25,7 @@ export const columns = (onAction: (bookId: string, taskType: string) => void): C
           variant="ghost"
           onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
         >
-          Title
+          标题
           <ArrowUpDown className="ml-2 h-4 w-4" />
         </Button>
       )
@@ -34,15 +33,15 @@ export const columns = (onAction: (bookId: string, taskType: string) => void): C
   },
   {
     accessorKey: "author",
-    header: "Author",
+    header: "作者",
   },
   {
     accessorKey: "source",
-    header: "Source",
+    header: "来源",
   },
   {
     accessorKey: "status",
-    header: "Status",
+    header: "状态",
   },
   {
     id: "actions",
@@ -53,21 +52,21 @@ export const columns = (onAction: (bookId: string, taskType: string) => void): C
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <Button variant="ghost" className="h-8 w-8 p-0">
-              <span className="sr-only">Open menu</span>
+              <span className="sr-only">打开菜单</span>
               <MoreHorizontal className="h-4 w-4" />
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end">
-            <DropdownMenuLabel>Actions</DropdownMenuLabel>
+            <DropdownMenuLabel>操作</DropdownMenuLabel>
             <DropdownMenuItem
               onClick={() => onAction(book.id.toString(), FETCH_CATALOG_TASK)}
             >
-              Fetch Catalog
+              获取目录
             </DropdownMenuItem>
             <DropdownMenuItem
               onClick={() => onAction(book.id.toString(), FETCH_BOOK_CONTENT_TASK)}
             >
-              Fetch Content
+              获取正文
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>

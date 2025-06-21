@@ -59,6 +59,7 @@ import {
   TabsList,
   TabsTrigger,
 } from "@/components/ui/tabs"
+import { AddBookDialog } from "./add-book-dialog"
 
 async function getBooks(): Promise<Book[]> {
   const response = await fetch("/api/books")
@@ -188,10 +189,7 @@ export function BooksDataTable() {
                 })}
             </DropdownMenuContent>
           </DropdownMenu>
-          <Button size="sm">
-            <IconPlus />
-            添加书籍
-          </Button>
+          <AddBookDialog />
         </div>
       </div>
       <div className="rounded-md border">

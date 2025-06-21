@@ -51,7 +51,7 @@ export default function TasksPage() {
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ message: 'Start a new background task!' }),
+        body: JSON.stringify({ taskType: 'fetch-catalog', bookId: '8' }),
       });
       await fetchJobs();
       if (!intervalRef.current) {
