@@ -1,0 +1,76 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+
+generator client {
+  provider = "prisma-client-js"
+  output   = "../app/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// 3. Define the Book model.
+// This model corresponds to the data in `app/api/books/route.ts`.
+model Book {
+  id        Int       @id @default(autoincrement())
+  title     String    @unique
+  author    String
+  status    BookStatus @default(DRAFT)
+  chapters  Chapter[]
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+}
+
+// 4. Define the Chapter model.
+// This model corresponds to the data in `app/api/chapters/route.ts`.
+// It includes a relation to the Book model.
+model Chapter {
+  id        Int       @id @default(autoincrement())
+  title     String
+  volume    String?
+  content   String // To store the chapter's text content for analysis.
+  status    ChapterStatus @default(UNANALYZED)
+  addedAt   DateTime  @default(now())
+
+  bookId    Int
+  book      Book      @relation(fields: [bookId], references: [id], onDelete: Cascade)
+
+  analysisResult AnalysisResult?
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+}
+
+// 5. Define the AnalysisResult model.
+// This model will store the results of chapter analysis,
+// corresponding to concepts like "plotAbstractions" in `app/api/stats/route.ts`.
+model AnalysisResult {
+  id               Int      @id @default(autoincrement())
+  plotAbstractions Json? // Flexible JSON field to store various analysis outputs.
+  summary          String?
+  analyzedAt       DateTime @default(now())
+
+  chapterId Int     @unique
+  chapter   Chapter @relation(fields: [chapterId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+// 6. Define Enums for status fields.
+// Using enums improves data integrity compared to raw strings.
+enum BookStatus {
+  PUBLISHED
+  DRAFT
+  ARCHIVED
+}
+
+enum ChapterStatus {
+  UNANALYZED
+  ANALYZED
+}

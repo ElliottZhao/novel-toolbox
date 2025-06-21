@@ -1,25 +1,22 @@
 "use client"
 
-import { IconTrendingUp } from "@tabler/icons-react"
-import { useQuery } from "@tanstack/react-query"
-
-import { Badge } from "@/components/ui/badge"
 import {
-  Card,
-  CardAction,
-  CardDescription,
-  CardFooter,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card"
-import { Skeleton } from "@/components/ui/skeleton"
+  IconArrowDownRight,
+  IconArrowUpRight,
+  IconBook,
+  IconBooks,
+  IconFileAnalytics,
+  IconGauge,
+} from "@tabler/icons-react"
+import { useQuery } from "@tanstack/react-query"
+import { Skeleton } from "./ui/skeleton"
 
 async function getStats() {
-  const response = await fetch("/api/stats")
-  if (!response.ok) {
+  const res = await fetch("/api/stats")
+  if (!res.ok) {
     throw new Error("Network response was not ok")
   }
-  return response.json()
+  return res.json()
 }
 
 export function SectionCards() {
@@ -28,97 +25,75 @@ export function SectionCards() {
     queryFn: getStats,
   })
 
+  const cards = [
+    {
+      title: "新增章节",
+      metric: data?.newChapters.value,
+      icon: <IconBooks />,
+      change: data?.newChapters.change,
+      changeType: data?.newChapters.changeType,
+    },
+    {
+      title: "已分析章节",
+      metric: data?.analyzedChapters.value,
+      icon: <IconBook />,
+      change: data?.analyzedChapters.change,
+      changeType: data?.analyzedChapters.changeType,
+    },
+    {
+      title: "情节抽象",
+      metric: data?.plotAbstractions.value,
+      icon: <IconFileAnalytics />,
+      change: data?.plotAbstractions.change,
+      changeType: data?.plotAbstractions.changeType,
+    },
+    {
+      title: "分析进度",
+      metric: `${data?.analysisProgress.value}%`,
+      icon: <IconGauge />,
+      change: data?.analysisProgress.change,
+      changeType: data?.analysisProgress.changeType,
+    },
+  ]
+
   if (isLoading) {
     return (
-      <div className="grid grid-cols-1 gap-4 px-4 lg:px-6 @xl/main:grid-cols-2 @5xl/main:grid-cols-4">
-        <Skeleton className="h-40" />
-        <Skeleton className="h-40" />
-        <Skeleton className="h-40" />
-        <Skeleton className="h-40" />
+      <div className="grid grid-cols-1 gap-6 @lg/main:grid-cols-2 @4xl/main:grid-cols-4">
+        {Array.from({ length: 4 }).map((_, i) => (
+          <Skeleton key={i} className="h-40 w-full" />
+        ))}
       </div>
     )
   }
 
   return (
-    <div className="*:data-[slot=card]:from-primary/5 *:data-[slot=card]:to-card dark:*:data-[slot=card]:bg-card grid grid-cols-1 gap-4 px-4 *:data-[slot=card]:bg-gradient-to-t *:data-[slot=card]:shadow-xs lg:px-6 @xl/main:grid-cols-2 @5xl/main:grid-cols-4">
-      <Card className="@container/card">
-        <CardHeader>
-          <CardDescription>新增章节</CardDescription>
-          <CardTitle className="text-2xl font-semibold tabular-nums @[250px]/card:text-3xl">
-            {data.newChapters.value}
-          </CardTitle>
-          <CardAction>
-            <Badge variant="outline">
-              <IconTrendingUp />+{data.newChapters.change}
-            </Badge>
-          </CardAction>
-        </CardHeader>
-        <CardFooter className="flex-col items-start gap-1.5 text-sm">
-          <div className="line-clamp-1 flex gap-2 font-medium">
-            本周新增 <IconTrendingUp className="size-4" />
+    <div className="grid grid-cols-1 gap-6 @lg/main:grid-cols-2 @4xl/main:grid-cols-4">
+      {cards.map((card) => (
+        <div
+          key={card.title}
+          className="bg-card text-card-foreground flex flex-col justify-between gap-6 rounded-lg border p-6"
+        >
+          <div className="flex items-start justify-between">
+            <div className="flex flex-col">
+              <p className="text-muted-foreground">{card.title}</p>
+              <p className="text-2xl font-bold">{card.metric ?? "..."}</p>
+            </div>
+            <div className="bg-muted text-muted-foreground flex size-10 items-center justify-center rounded-lg">
+              {card.icon}
+            </div>
           </div>
-          <div className="text-muted-foreground">
-            反映了故事内容的快速扩充
+          <div className="flex items-center gap-1 text-xs">
+            {card.changeType === "increase" ? (
+              <IconArrowUpRight className="text-green-500" />
+            ) : (
+              <IconArrowDownRight className="text-red-500" />
+            )}
+            <span className="text-muted-foreground">
+              {card.change}% since last month
+            </span>
           </div>
-        </CardFooter>
-      </Card>
-      <Card className="@container/card">
-        <CardHeader>
-          <CardDescription>已分析章节</CardDescription>
-          <CardTitle className="text-2xl font-semibold tabular-nums @[250px]/card:text-3xl">
-            {data.analyzedChapters.value}
-          </CardTitle>
-          <CardAction>
-            <Badge variant="outline">
-              <IconTrendingUp />+{data.analyzedChapters.change}
-            </Badge>
-          </CardAction>
-        </CardHeader>
-        <CardFooter className="flex-col items-start gap-1.5 text-sm">
-          <div className="line-clamp-1 flex gap-2 font-medium">
-            本周分析 <IconTrendingUp className="size-4" />
-          </div>
-          <div className="text-muted-foreground">研究工作稳步推进</div>
-        </CardFooter>
-      </Card>
-      <Card className="@container/card">
-        <CardHeader>
-          <CardDescription>情节抽象</CardDescription>
-          <CardTitle className="text-2xl font-semibold tabular-nums @[250px]/card:text-3xl">
-            {Intl.NumberFormat().format(data.plotAbstractions.value)}
-          </CardTitle>
-          <CardAction>
-            <Badge variant="outline">
-              <IconTrendingUp />+{data.plotAbstractions.change}
-            </Badge>
-          </CardAction>
-        </CardHeader>
-        <CardFooter className="flex-col items-start gap-1.5 text-sm">
-          <div className="line-clamp-1 flex gap-2 font-medium">
-            持续增长中 <IconTrendingUp className="size-4" />
-          </div>
-          <div className="text-muted-foreground">揭示了故事深层结构</div>
-        </CardFooter>
-      </Card>
-      <Card className="@container/card">
-        <CardHeader>
-          <CardDescription>分析进度</CardDescription>
-          <CardTitle className="text-2xl font-semibold tabular-nums @[250px]/card:text-3xl">
-            {data.analysisProgress.value}%
-          </CardTitle>
-          <CardAction>
-            <Badge variant="outline">
-              <IconTrendingUp />+{data.analysisProgress.change}%
-            </Badge>
-          </CardAction>
-        </CardHeader>
-        <CardFooter className="flex-col items-start gap-1.5 text-sm">
-          <div className="line-clamp-1 flex gap-2 font-medium">
-            进度超过预期 <IconTrendingUp className="size-4" />
-          </div>
-          <div className="text-muted-foreground">目标 100%</div>
-        </CardFooter>
-      </Card>
+        </div>
+      ))}
     </div>
   )
 }

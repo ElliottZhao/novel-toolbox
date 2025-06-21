@@ -1,99 +1,46 @@
 import { NextResponse } from "next/server"
+import prisma from "@/lib/prisma"
+import { ChapterStatus } from "@/app/generated/prisma"
 
-const chartData = [
-  { date: "2024-04-01", new: 22, analyzed: 15 },
-  { date: "2024-04-02", new: 10, analyzed: 18 },
-  { date: "2024-04-03", new: 17, analyzed: 12 },
-  { date: "2024-04-04", new: 24, analyzed: 26 },
-  { date: "2024-04-05", new: 37, analyzed: 29 },
-  { date: "2024-04-06", new: 30, analyzed: 34 },
-  { date: "2024-04-07", new: 25, analyzed: 18 },
-  { date: "2024-04-08", new: 41, analyzed: 32 },
-  { date: "2024-04-09", new: 6, analyzed: 11 },
-  { date: "2024-04-10", new: 26, analyzed: 19 },
-  { date: "2024-04-11", new: 33, analyzed: 35 },
-  { date: "2024-04-12", new: 29, analyzed: 21 },
-  { date: "2024-04-13", new: 34, analyzed: 38 },
-  { date: "2024-04-14", new: 14, analyzed: 22 },
-  { date: "2024-04-15", new: 12, analyzed: 17 },
-  { date: "2024-04-16", new: 14, analyzed: 19 },
-  { date: "2024-04-17", new: 45, analyzed: 36 },
-  { date: "2024-04-18", new: 36, analyzed: 41 },
-  { date: "2024-04-19", new: 24, analyzed: 18 },
-  { date: "2024-04-20", new: 9, analyzed: 15 },
-  { date: "2024-04-21", new: 14, analyzed: 20 },
-  { date: "2024-04-22", new: 22, analyzed: 17 },
-  { date: "2024-04-23", new: 14, analyzed: 23 },
-  { date: "2024-04-24", new: 39, analyzed: 29 },
-  { date: "2024-04-25", new: 22, analyzed: 25 },
-  { date: "2024-04-26", new: 8, analyzed: 13 },
-  { date: "2024-04-27", new: 38, analyzed: 42 },
-  { date: "2024-04-28", new: 12, analyzed: 18 },
-  { date: "2024-04-29", new: 32, analyzed: 24 },
-  { date: "2024-04-30", new: 45, analyzed: 38 },
-  { date: "2024-05-01", new: 17, analyzed: 22 },
-  { date: "2024-05-02", new: 29, analyzed: 31 },
-  { date: "2024-05-03", new: 25, analyzed: 19 },
-  { date: "2024-05-04", new: 39, analyzed: 42 },
-  { date: "2024-05-05", new: 48, analyzed: 39 },
-  { date: "2024-05-06", new: 50, analyzed: 52 },
-  { date: "2024-05-07", new: 39, analyzed: 30 },
-  { date: "2024-05-08", new: 15, analyzed: 21 },
-  { date: "2024-05-09", new: 23, analyzed: 18 },
-  { date: "2024-05-10", new: 29, analyzed: 33 },
-  { date: "2024-05-11", new: 34, analyzed: 27 },
-  { date: "2024-05-12", new: 20, analyzed: 24 },
-  { date: "2024-05-13", new: 20, analyzed: 16 },
-  { date: "2024-05-14", new: 45, analyzed: 49 },
-  { date: "2024-05-15", new: 47, analyzed: 38 },
-  { date: "2024-05-16", new: 34, analyzed: 40 },
-  { date: "2024-05-17", new: 50, analyzed: 42 },
-  { date: "2024-05-18", new: 32, analyzed: 35 },
-  { date: "2024-05-19", new: 24, analyzed: 18 },
-  { date: "2024-05-20", new: 18, analyzed: 23 },
-  { date: "2024-05-21", new: 8, analyzed: 14 },
-  { date: "2024-05-22", new: 8, analyzed: 12 },
-  { date: "2024-05-23", new: 25, analyzed: 29 },
-  { date: "2024-05-24", new: 29, analyzed: 22 },
-  { date: "2024-05-25", new: 20, analyzed: 25 },
-  { date: "2024-05-26", new: 21, analyzed: 17 },
-  { date: "2024-05-27", new: 42, analyzed: 46 },
-  { date: "2024-05-28", new: 23, analyzed: 19 },
-  { date: "2024-05-29", new: 8, analyzed: 13 },
-  { date: "2024-05-30", new: 34, analyzed: 28 },
-  { date: "2024-05-31", new: 18, analyzed: 23 },
-  { date: "2024-06-01", new: 18, analyzed: 20 },
-  { date: "2024-06-02", new: 47, analyzed: 41 },
-  { date: "2024-06-03", new: 10, analyzed: 16 },
-  { date: "2024-06-04", new: 44, analyzed: 38 },
-  { date: "2024-06-05", new: 9, analyzed: 14 },
-  { date: "2024-06-06", new: 29, analyzed: 25 },
-  { date: "2024-06-07", new: 32, analyzed: 37 },
-  { date: "2024-06-08", new: 39, analyzed: 32 },
-  { date: "2024-06-09", new: 44, analyzed: 48 },
-  { date: "2024-06-10", new: 16, analyzed: 20 },
-  { date: "2024-06-11", new: 9, analyzed: 15 },
-  { date: "2024-06-12", new: 49, analyzed: 42 },
-  { date: "2024-06-13", new: 8, analyzed: 13 },
-  { date: "2024-06-14", new: 43, analyzed: 38 },
-  { date: "2024-06-15", new: 31, analyzed: 35 },
-  { date: "2024-06-16", new: 37, analyzed: 31 },
-  { date: "2024-06-17", new: 48, analyzed: 52 },
-  { date: "2024-06-18", new: 11, analyzed: 17 },
-  { date: "2024-06-19", new: 34, analyzed: 29 },
-  { date: "2024-06-20", new: 41, analyzed: 45 },
-  { date: "2024-06-21", new: 17, analyzed: 21 },
-  { date: "2024-06-22", new: 32, analyzed: 27 },
-  { date: "2024-06-23", new: 48, analyzed: 53 },
-  { date: "2024-06-24", new: 13, analyzed: 18 },
-  { date: "2024-06-25", new: 14, analyzed: 19 },
-  { date: "2024-06-26", new: 43, analyzed: 38 },
-  { date: "2024-06-27", new: 45, analyzed: 49 },
-  { date: "2024-06-28", new: 15, analyzed: 20 },
-  { date: "2024-06-29", new: 10, analyzed: 16 },
-  { date: "2024-06-30", new: 45, analyzed: 40 },
-]
+// Helper to format date as YYYY-MM-DD
+const formatDate = (date: Date): string => {
+  return date.toISOString().split("T")[0]
+}
 
 export async function GET() {
-  return NextResponse.json(chartData)
+  try {
+    const chapters = await prisma.chapter.findMany({
+      select: {
+        addedAt: true,
+        status: true,
+      },
+    })
+
+    const dailyData: {
+      [key: string]: { date: string; new: number; analyzed: number }
+    } = {}
+
+    for (const chapter of chapters) {
+      const date = formatDate(chapter.addedAt)
+      if (!dailyData[date]) {
+        dailyData[date] = { date, new: 0, analyzed: 0 }
+      }
+      dailyData[date].new += 1
+      if (chapter.status === ChapterStatus.ANALYZED) {
+        dailyData[date].analyzed += 1
+      }
+    }
+
+    const chartData = Object.values(dailyData).sort(
+      (a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()
+    )
+
+    return NextResponse.json(chartData)
+  } catch (error) {
+    console.error("Failed to fetch chart data:", error)
+    return NextResponse.json(
+      { error: "Failed to fetch chart data." },
+      { status: 500 }
+    )
+  }
 } 

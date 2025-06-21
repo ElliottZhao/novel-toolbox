@@ -1,65 +1,67 @@
 import { NextResponse } from "next/server"
-import { Chapter } from "@/lib/schemas"
+import prisma from "@/lib/prisma"
+import { z } from "zod"
 
-const chapters: Chapter[] = [
-  {
-    id: "2",
-    bookTitle: "斗破苍穹",
-    volumeName: "第一卷",
-    chapterName: "陨落的天才",
-    dateAdded: "2023-01-20",
-    status: "unanalyzed",
-  },
-  {
-    id: "3",
-    bookTitle: "凡人修仙传",
-    volumeName: "第一卷",
-    chapterName: "山边小村",
-    dateAdded: "2023-02-01",
-    status: "unanalyzed",
-  },
-  {
-    id: "5",
-    bookTitle: "斗破苍穹",
-    volumeName: "第一卷",
-    chapterName: "斗气",
-    dateAdded: "2023-02-10",
-    status: "unanalyzed",
-  },
-  {
-    id: "1",
-    bookTitle: "大主宰",
-    volumeName: "卷一",
-    chapterName: "北灵院",
-    dateAdded: "2023-01-15",
-    status: "analyzed",
-  },
-  {
-    id: "4",
-    bookTitle: "大主宰",
-    volumeName: "卷一",
-    chapterName: "牧尘",
-    dateAdded: "2023-02-05",
-    status: "analyzed",
-  },
-  {
-    id: "6",
-    bookTitle: "诡秘之主",
-    volumeName: "第一卷：小丑",
-    chapterName: " crimson",
-    dateAdded: "2024-05-10",
-    status: "unanalyzed",
-  },
-  {
-    id: "7",
-    bookTitle: "诡秘之主",
-    volumeName: "第一卷：小丑",
-    chapterName: "观众",
-    dateAdded: "2024-05-11",
-    status: "analyzed",
-  },
-]
 
-export async function GET() {
-  return NextResponse.json(chapters)
+const createChapterSchema = z.object({
+  title: z.string().min(1, "Title is required."),
+  volume: z.string().optional(),
+  content: z.string().min(1, "Content is required."),
+  bookId: z.number().int().positive("A valid book ID is required."),
+})
+
+export async function GET(request: Request) {
+  const { searchParams } = new URL(request.url)
+  const bookId = searchParams.get("bookId")
+
+  try {
+    const chapters = await prisma.chapter.findMany({
+      where: bookId ? { bookId: Number(bookId) } : {},
+      include: {
+        book: {
+          select: {
+            title: true,
+          },
+        },
+      },
+      orderBy: {
+        addedAt: "desc",
+      },
+    })
+    return NextResponse.json(chapters)
+  } catch (error) {
+    console.error("Failed to fetch chapters:", error)
+    return NextResponse.json(
+      { error: "Failed to fetch chapters." },
+      { status: 500 }
+    )
+  }
+}
+
+export async function POST(request: Request) {
+  try {
+    const json = await request.json()
+    const data = createChapterSchema.parse(json)
+
+    const newChapter = await prisma.chapter.create({
+      data: {
+        title: data.title,
+        volume: data.volume,
+        content: data.content,
+        bookId: data.bookId,
+        // Default status is UNANALYZED
+      },
+    })
+
+    return NextResponse.json(newChapter, { status: 201 })
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      return NextResponse.json({ error: error.issues }, { status: 400 })
+    }
+    console.error("Failed to create chapter:", error)
+    return NextResponse.json(
+      { error: "Failed to create chapter." },
+      { status: 500 }
+    )
+  }
 } 

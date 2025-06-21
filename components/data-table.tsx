@@ -115,15 +115,16 @@ const columns: ColumnDef<Chapter>[] = [
     enableHiding: false,
   },
   {
-    accessorKey: "bookTitle",
+    accessorFn: (row) => row.book?.title,
+    id: "bookTitle",
     header: "书名",
   },
   {
-    accessorKey: "volumeName",
+    accessorKey: "volume",
     header: "分卷名",
   },
   {
-    accessorKey: "chapterName",
+    accessorKey: "title",
     header: "章节名",
     cell: ({ row }) => {
       return <TableCellViewer item={row.original} />
@@ -131,10 +132,10 @@ const columns: ColumnDef<Chapter>[] = [
     enableHiding: false,
   },
   {
-    accessorKey: "dateAdded",
+    accessorKey: "addedAt",
     header: "入库时间",
     cell: ({ row }) => {
-      const date = new Date(row.getValue("dateAdded"))
+      const date = new Date(row.getValue("addedAt"))
       return date.toLocaleDateString("zh-CN")
     },
   },
@@ -142,18 +143,18 @@ const columns: ColumnDef<Chapter>[] = [
     accessorKey: "status",
     header: "状态",
     cell: ({ row }) => {
-      const status: "analyzed" | "unanalyzed" = row.getValue("status")
+      const status: "ANALYZED" | "UNANALYZED" = row.getValue("status")
       return (
         <Badge
           variant="outline"
           className="text-muted-foreground whitespace-nowrap px-1.5"
         >
-          {status === "analyzed" ? (
+          {status === "ANALYZED" ? (
             <IconCircleCheckFilled className="fill-green-500 dark:fill-green-400" />
           ) : (
             <IconLoader />
           )}
-          {status === "analyzed" ? "已分析" : "未分析"}
+          {status === "ANALYZED" ? "已分析" : "未分析"}
         </Badge>
       )
     },
@@ -201,6 +202,35 @@ export function DataTable() {
     pageSize: 10,
   })
 
+  const { analyzedCount, unanalyzedCount, totalCount } = React.useMemo(() => {
+    console.log("Data for counting:", data)
+    const analyzed = data.filter((c) => c.status === "ANALYZED").length
+    const unanalyzed = data.filter((c) => c.status === "UNANALYZED").length
+    const total = data.length
+    console.log("Calculated counts:", {
+      analyzed,
+      unanalyzed,
+      total,
+    })
+    return {
+      analyzedCount: analyzed,
+      unanalyzedCount: unanalyzed,
+      totalCount: total,
+    }
+  }, [data])
+
+  const [currentView, setCurrentView] = React.useState("all-chapters")
+
+  const handleViewChange = (view: string) => {
+    setCurrentView(view)
+    if (view === "all-chapters") {
+      setColumnFilters([])
+    } else {
+      const filterValue = view === "analyzed" ? "ANALYZED" : "UNANALYZED"
+      setColumnFilters([{ id: "status", value: filterValue }])
+    }
+  }
+
   const table = useReactTable({
     data,
     columns,
@@ -226,16 +256,160 @@ export function DataTable() {
     getFacetedUniqueValues: getFacetedUniqueValues(),
   })
 
+  const tableContent = (
+    <div className="relative flex flex-col gap-4 overflow-auto px-4 lg:px-6">
+      <div className="overflow-hidden rounded-lg border">
+        <Table>
+          <TableHeader className="bg-muted sticky top-0 z-10">
+            {table.getHeaderGroups().map((headerGroup) => (
+              <TableRow key={headerGroup.id}>
+                {headerGroup.headers.map((header) => {
+                  return (
+                    <TableHead key={header.id} colSpan={header.colSpan}>
+                      {header.isPlaceholder
+                        ? null
+                        : flexRender(
+                            header.column.columnDef.header,
+                            header.getContext()
+                          )}
+                    </TableHead>
+                  )
+                })}
+              </TableRow>
+            ))}
+          </TableHeader>
+          <TableBody>
+            {isLoading ? (
+              <TableRow>
+                <TableCell
+                  colSpan={columns.length}
+                  className="h-24 text-center"
+                >
+                  <div className="flex justify-center">
+                    <IconLoader className="h-6 w-6 animate-spin" />
+                  </div>
+                </TableCell>
+              </TableRow>
+            ) : table.getRowModel().rows?.length ? (
+              table.getRowModel().rows.map((row) => (
+                <TableRow
+                  key={row.id}
+                  data-state={row.getIsSelected() && "selected"}
+                >
+                  {row.getVisibleCells().map((cell) => (
+                    <TableCell key={cell.id}>
+                      {flexRender(
+                        cell.column.columnDef.cell,
+                        cell.getContext()
+                      )}
+                    </TableCell>
+                  ))}
+                </TableRow>
+              ))
+            ) : (
+              <TableRow>
+                <TableCell
+                  colSpan={columns.length}
+                  className="h-24 text-center"
+                >
+                  无结果。
+                </TableCell>
+              </TableRow>
+            )}
+          </TableBody>
+        </Table>
+      </div>
+      <div className="flex items-center justify-between px-4">
+        <div className="text-muted-foreground hidden flex-1 text-sm lg:flex">
+          已选择 {table.getFilteredSelectedRowModel().rows.length} 行，共{" "}
+          {table.getFilteredRowModel().rows.length} 行。
+        </div>
+        <div className="flex w-full items-center gap-8 lg:w-fit">
+          <div className="hidden items-center gap-2 lg:flex">
+            <Label htmlFor="rows-per-page" className="text-sm font-medium">
+              每页行数
+            </Label>
+            <Select
+              value={`${table.getState().pagination.pageSize}`}
+              onValueChange={(value) => {
+                table.setPageSize(Number(value))
+              }}
+            >
+              <SelectTrigger size="sm" className="w-20" id="rows-per-page">
+                <SelectValue
+                  placeholder={table.getState().pagination.pageSize}
+                />
+              </SelectTrigger>
+              <SelectContent side="top">
+                {[10, 20, 30, 40, 50].map((pageSize) => (
+                  <SelectItem key={pageSize} value={`${pageSize}`}>
+                    {pageSize}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="flex w-fit items-center justify-center text-sm font-medium">
+            第 {table.getState().pagination.pageIndex + 1} 页，共{" "}
+            {table.getPageCount()} 页
+          </div>
+          <div className="ml-auto flex items-center gap-2 lg:ml-0">
+            <Button
+              variant="outline"
+              className="hidden h-8 w-8 p-0 lg:flex"
+              onClick={() => table.setPageIndex(0)}
+              disabled={!table.getCanPreviousPage()}
+            >
+              <span className="sr-only">跳转至首页</span>
+              <IconChevronsLeft />
+            </Button>
+            <Button
+              variant="outline"
+              className="size-8"
+              size="icon"
+              onClick={() => table.previousPage()}
+              disabled={!table.getCanPreviousPage()}
+            >
+              <span className="sr-only">上一页</span>
+              <IconChevronLeft />
+            </Button>
+            <Button
+              variant="outline"
+              className="size-8"
+              size="icon"
+              onClick={() => table.nextPage()}
+              disabled={!table.getCanNextPage()}
+            >
+              <span className="sr-only">下一页</span>
+              <IconChevronRight />
+            </Button>
+            <Button
+              variant="outline"
+              className="hidden size-8 lg:flex"
+              size="icon"
+              onClick={() => table.setPageIndex(table.getPageCount() - 1)}
+              disabled={!table.getCanNextPage()}
+            >
+              <span className="sr-only">跳转至末页</span>
+              <IconChevronsRight />
+            </Button>
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+
   return (
     <Tabs
-      defaultValue="all-chapters"
+      value={currentView}
+      onValueChange={handleViewChange}
       className="w-full flex-col justify-start gap-6"
     >
       <div className="flex items-center justify-between px-4 lg:px-6">
         <Label htmlFor="view-selector" className="sr-only">
           视图
         </Label>
-        <Select defaultValue="all-chapters">
+        <Select value={currentView} onValueChange={handleViewChange}>
           <SelectTrigger
             className="flex w-fit @4xl/main:hidden"
             size="sm"
@@ -244,18 +418,22 @@ export function DataTable() {
             <SelectValue placeholder="选择一个视图" />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="all-chapters">所有章节</SelectItem>
-            <SelectItem value="unanalyzed">未分析</SelectItem>
-            <SelectItem value="analyzed">已分析</SelectItem>
+            <SelectItem value="all-chapters">所有章节 ({totalCount})</SelectItem>
+            <SelectItem value="unanalyzed">
+              未分析 ({unanalyzedCount})
+            </SelectItem>
+            <SelectItem value="analyzed">已分析 ({analyzedCount})</SelectItem>
           </SelectContent>
         </Select>
         <TabsList className="**:data-[slot=badge]:bg-muted-foreground/30 hidden **:data-[slot=badge]:size-5 **:data-[slot=badge]:rounded-full **:data-[slot=badge]:px-1 @4xl/main:flex">
-          <TabsTrigger value="all-chapters">所有章节</TabsTrigger>
+          <TabsTrigger value="all-chapters">
+            所有章节 <Badge variant="secondary">{totalCount}</Badge>
+          </TabsTrigger>
           <TabsTrigger value="unanalyzed">
-            未分析 <Badge variant="secondary">3</Badge>
+            未分析 <Badge variant="secondary">{unanalyzedCount}</Badge>
           </TabsTrigger>
           <TabsTrigger value="analyzed">
-            已分析 <Badge variant="secondary">4</Badge>
+            已分析 <Badge variant="secondary">{analyzedCount}</Badge>
           </TabsTrigger>
         </TabsList>
         <div className="flex items-center gap-2">
@@ -290,8 +468,8 @@ export function DataTable() {
                       {
                         {
                           bookTitle: "书名",
-                          volumeName: "分卷名",
-                          dateAdded: "入库时间",
+                          volume: "分卷名",
+                          addedAt: "入库时间",
                           status: "状态",
                         }[column.id]
                       }
@@ -306,155 +484,9 @@ export function DataTable() {
           </Button>
         </div>
       </div>
-      <TabsContent
-        value="all-chapters"
-        className="relative flex flex-col gap-4 overflow-auto px-4 lg:px-6"
-      >
-        <div className="overflow-hidden rounded-lg border">
-          <Table>
-            <TableHeader className="bg-muted sticky top-0 z-10">
-              {table.getHeaderGroups().map((headerGroup) => (
-                <TableRow key={headerGroup.id}>
-                  {headerGroup.headers.map((header) => {
-                    return (
-                      <TableHead key={header.id} colSpan={header.colSpan}>
-                        {header.isPlaceholder
-                          ? null
-                          : flexRender(
-                              header.column.columnDef.header,
-                              header.getContext()
-                            )}
-                      </TableHead>
-                    )
-                  })}
-                </TableRow>
-              ))}
-            </TableHeader>
-            <TableBody>
-              {isLoading ? (
-                <TableRow>
-                  <TableCell
-                    colSpan={columns.length}
-                    className="h-24 text-center"
-                  >
-                    <div className="flex justify-center">
-                      <IconLoader className="h-6 w-6 animate-spin" />
-                    </div>
-                  </TableCell>
-                </TableRow>
-              ) : table.getRowModel().rows?.length ? (
-                table.getRowModel().rows.map((row) => (
-                  <TableRow
-                    key={row.id}
-                    data-state={row.getIsSelected() && "selected"}
-                  >
-                    {row.getVisibleCells().map((cell) => (
-                      <TableCell key={cell.id}>
-                        {flexRender(
-                          cell.column.columnDef.cell,
-                          cell.getContext()
-                        )}
-                      </TableCell>
-                    ))}
-                  </TableRow>
-                ))
-              ) : (
-                <TableRow>
-                  <TableCell
-                    colSpan={columns.length}
-                    className="h-24 text-center"
-                  >
-                    无结果。
-                  </TableCell>
-                </TableRow>
-              )}
-            </TableBody>
-          </Table>
-        </div>
-        <div className="flex items-center justify-between px-4">
-          <div className="text-muted-foreground hidden flex-1 text-sm lg:flex">
-            已选择 {table.getFilteredSelectedRowModel().rows.length} 行，共{" "}
-            {table.getFilteredRowModel().rows.length} 行。
-          </div>
-          <div className="flex w-full items-center gap-8 lg:w-fit">
-            <div className="hidden items-center gap-2 lg:flex">
-              <Label htmlFor="rows-per-page" className="text-sm font-medium">
-                每页行数
-              </Label>
-              <Select
-                value={`${table.getState().pagination.pageSize}`}
-                onValueChange={(value) => {
-                  table.setPageSize(Number(value))
-                }}
-              >
-                <SelectTrigger size="sm" className="w-20" id="rows-per-page">
-                  <SelectValue
-                    placeholder={table.getState().pagination.pageSize}
-                  />
-                </SelectTrigger>
-                <SelectContent side="top">
-                  {[10, 20, 30, 40, 50].map((pageSize) => (
-                    <SelectItem key={pageSize} value={`${pageSize}`}>
-                      {pageSize}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="flex w-fit items-center justify-center text-sm font-medium">
-              第 {table.getState().pagination.pageIndex + 1} 页，共{" "}
-              {table.getPageCount()} 页
-            </div>
-            <div className="ml-auto flex items-center gap-2 lg:ml-0">
-              <Button
-                variant="outline"
-                className="hidden h-8 w-8 p-0 lg:flex"
-                onClick={() => table.setPageIndex(0)}
-                disabled={!table.getCanPreviousPage()}
-              >
-                <span className="sr-only">跳转至首页</span>
-                <IconChevronsLeft />
-              </Button>
-              <Button
-                variant="outline"
-                className="size-8"
-                size="icon"
-                onClick={() => table.previousPage()}
-                disabled={!table.getCanPreviousPage()}
-              >
-                <span className="sr-only">上一页</span>
-                <IconChevronLeft />
-              </Button>
-              <Button
-                variant="outline"
-                className="size-8"
-                size="icon"
-                onClick={() => table.nextPage()}
-                disabled={!table.getCanNextPage()}
-              >
-                <span className="sr-only">下一页</span>
-                <IconChevronRight />
-              </Button>
-              <Button
-                variant="outline"
-                className="hidden size-8 lg:flex"
-                size="icon"
-                onClick={() => table.setPageIndex(table.getPageCount() - 1)}
-                disabled={!table.getCanNextPage()}
-              >
-                <span className="sr-only">跳转至末页</span>
-                <IconChevronsRight />
-              </Button>
-            </div>
-          </div>
-        </div>
-      </TabsContent>
-      <TabsContent value="unanalyzed" className="flex flex-col px-4 lg:px-6">
-        <div className="aspect-video w-full flex-1 rounded-lg border border-dashed"></div>
-      </TabsContent>
-      <TabsContent value="analyzed" className="flex flex-col px-4 lg:px-6">
-        <div className="aspect-video w-full flex-1 rounded-lg border border-dashed"></div>
-      </TabsContent>
+      <TabsContent value="all-chapters">{tableContent}</TabsContent>
+      <TabsContent value="unanalyzed">{tableContent}</TabsContent>
+      <TabsContent value="analyzed">{tableContent}</TabsContent>
     </Tabs>
   )
 }
@@ -466,36 +498,36 @@ function TableCellViewer({ item }: { item: Chapter }) {
     <Drawer direction={isMobile ? "bottom" : "right"}>
       <DrawerTrigger asChild>
         <Button variant="link" className="text-foreground w-fit px-0 text-left">
-          {item.chapterName}
+          {item.title}
         </Button>
       </DrawerTrigger>
       <DrawerContent>
         <DrawerHeader className="gap-1">
-          <DrawerTitle>{item.chapterName}</DrawerTitle>
+          <DrawerTitle>{item.title}</DrawerTitle>
           <DrawerDescription>
-            {item.bookTitle} - {item.volumeName}
+            {item.book?.title} - {item.volume}
           </DrawerDescription>
         </DrawerHeader>
         <div className="flex flex-col gap-4 overflow-y-auto px-4 text-sm">
           <form className="flex flex-col gap-4">
             <div className="flex flex-col gap-3">
               <Label htmlFor="bookTitle">书名</Label>
-              <Input id="bookTitle" defaultValue={item.bookTitle} />
+              <Input id="bookTitle" defaultValue={item.book?.title} />
             </div>
             <div className="flex flex-col gap-3">
               <Label htmlFor="volumeName">分卷名</Label>
-              <Input id="volumeName" defaultValue={item.volumeName} />
+              <Input id="volumeName" defaultValue={item.volume ?? ""} />
             </div>
             <div className="flex flex-col gap-3">
               <Label htmlFor="chapterName">章节名</Label>
-              <Input id="chapterName" defaultValue={item.chapterName} />
+              <Input id="chapterName" defaultValue={item.title} />
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div className="flex flex-col gap-3">
                 <Label htmlFor="dateAdded">入库时间</Label>
                 <Input
                   id="dateAdded"
-                  defaultValue={new Date(item.dateAdded).toLocaleDateString(
+                  defaultValue={new Date(item.addedAt).toLocaleDateString(
                     "zh-CN"
                   )}
                 />
@@ -507,8 +539,8 @@ function TableCellViewer({ item }: { item: Chapter }) {
                     <SelectValue placeholder="选择状态" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="analyzed">已分析</SelectItem>
-                    <SelectItem value="unanalyzed">未分析</SelectItem>
+                    <SelectItem value="ANALYZED">已分析</SelectItem>
+                    <SelectItem value="UNANALYZED">未分析</SelectItem>
                   </SelectContent>
                 </Select>
               </div>

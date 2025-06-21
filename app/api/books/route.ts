@@ -1,39 +1,51 @@
 import { NextResponse } from "next/server"
-import { Book } from "@/lib/schemas"
+import prisma from "@/lib/prisma"
+import { z } from "zod"
 
-const books: Book[] = [
-  {
-    id: "1",
-    bookTitle: "斗破苍穹",
-    author: "天蚕土豆",
-    status: "已发布",
-  },
-  {
-    id: "2",
-    bookTitle: "凡人修仙传",
-    author: "忘语",
-    status: "已发布",
-  },
-  {
-    id: "3",
-    bookTitle: "大主宰",
-    author: "天蚕土豆",
-    status: "已发布",
-  },
-  {
-    id: "4",
-    bookTitle: "诡秘之主",
-    author: "爱潜水的乌贼",
-    status: "草稿",
-  },
-  {
-    id: "5",
-    bookTitle: "雪中悍刀行",
-    author: "烽火戏诸侯",
-    status: "已归档",
-  },
-]
+// Zod schema for book creation
+const createBookSchema = z.object({
+  title: z.string().min(1, "Title is required."),
+  author: z.string().min(1, "Author is required."),
+})
 
 export async function GET() {
-  return NextResponse.json(books)
+  try {
+    const books = await prisma.book.findMany()
+    // The schema from /lib/schemas.ts is incompatible with the Prisma model.
+    // We will return Prisma's model directly.
+    // You may want to adjust the frontend to match.
+    return NextResponse.json(books)
+  } catch (error) {
+    console.error("Failed to fetch books:", error)
+    return NextResponse.json(
+      { error: "Failed to fetch books." },
+      { status: 500 }
+    )
+  }
+}
+
+export async function POST(request: Request) {
+  try {
+    const json = await request.json()
+    const { title, author } = createBookSchema.parse(json)
+
+    const newBook = await prisma.book.create({
+      data: {
+        title,
+        author,
+        // Default status is DRAFT as per schema.prisma
+      },
+    })
+
+    return NextResponse.json(newBook, { status: 201 })
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      return NextResponse.json({ error: error.issues }, { status: 400 })
+    }
+    console.error("Failed to create book:", error)
+    return NextResponse.json(
+      { error: "Failed to create book." },
+      { status: 500 }
+    )
+  }
 } 

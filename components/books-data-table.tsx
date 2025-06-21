@@ -73,6 +73,15 @@ async function getBooks(): Promise<Book[]> {
   return z.array(bookSchema).parse(data)
 }
 
+// Map English status to Chinese for display
+const statusMap: {
+  [key in Book["status"]]: string
+} = {
+  PUBLISHED: "已发布",
+  DRAFT: "草稿",
+  ARCHIVED: "已归档",
+}
+
 const columns: ColumnDef<Book>[] = [
   {
     id: "select",
@@ -101,7 +110,7 @@ const columns: ColumnDef<Book>[] = [
     enableHiding: false,
   },
   {
-    accessorKey: "bookTitle",
+    accessorKey: "title",
     header: "书名",
   },
   {
@@ -112,13 +121,13 @@ const columns: ColumnDef<Book>[] = [
     accessorKey: "status",
     header: "状态",
     cell: ({ row }) => {
-      const status: "已发布" | "草稿" | "已归档" = row.getValue("status")
+      const status: Book["status"] = row.getValue("status")
       return (
         <Badge
           variant="outline"
           className="text-muted-foreground whitespace-nowrap px-1.5"
         >
-          {status}
+          {statusMap[status] || status}
         </Badge>
       )
     },
@@ -240,7 +249,7 @@ export function BooksDataTable() {
                     >
                       {
                         {
-                          bookTitle: "书名",
+                          title: "书名",
                           author: "作者",
                           status: "状态",
                         }[column.id]
