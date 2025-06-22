@@ -123,6 +123,7 @@ function ChapterContent({ id }: { id: string }) {
     queryKey: ["chapter", id],
     queryFn: () => getChapter(id),
     enabled: !!id,
+    refetchOnWindowFocus: true,
   })
 
   const {
@@ -177,20 +178,37 @@ function ChapterContent({ id }: { id: string }) {
   }
 
   // 删除标注从本地状态
-  const removeAnnotationFromParagraph = (annotationId: string) => {
-    queryClient.setQueryData(["chapter", id], (oldData: ChapterWithDetails | undefined) => {
-      if (!oldData) return oldData
+  const removeAnnotationFromParagraph = async (annotationId: string) => {
+    try {
+      // 调用API删除标注
+      const response = await fetch(`/api/character-annotations?id=${annotationId}`, {
+        method: 'DELETE',
+      })
       
-      return {
-        ...oldData,
-        paragraphs: oldData.paragraphs.map(paragraph => {
-          return {
-            ...paragraph,
-            annotations: paragraph.annotations.filter(annotation => annotation.id !== annotationId)
-          }
-        })
+      if (!response.ok) {
+        throw new Error('删除标注失败')
       }
-    })
+      
+      // 更新本地缓存
+      queryClient.setQueryData(["chapter", id], (oldData: ChapterWithDetails | undefined) => {
+        if (!oldData) return oldData
+        
+        return {
+          ...oldData,
+          paragraphs: oldData.paragraphs.map(paragraph => {
+            return {
+              ...paragraph,
+              annotations: paragraph.annotations.filter(annotation => annotation.id !== annotationId)
+            }
+          })
+        }
+      })
+      
+      toast.success("标注已删除")
+    } catch (error) {
+      toast.error("删除标注失败")
+      console.error("Delete annotation error:", error)
+    }
   }
 
   useEffect(() => {
@@ -231,6 +249,14 @@ function ChapterContent({ id }: { id: string }) {
   return (
     <div className="container mx-auto p-4 md:p-6">
       <div className="mb-8">
+        <div className="flex items-center gap-4 mb-4">
+          <Link href="/chapters">
+            <Button variant="ghost" size="sm" className="flex items-center gap-2">
+              <IconChevronLeft className="h-4 w-4" />
+              返回章节列表
+            </Button>
+          </Link>
+        </div>
         <h1 className="text-4xl font-bold leading-tight tracking-tighter md:text-5xl">
           {chapter.title}
         </h1>
@@ -269,28 +295,49 @@ function ChapterContent({ id }: { id: string }) {
       {/* 章节导航 */}
       <div className="mt-12 flex items-center justify-between border-t pt-8">
         <div className="flex-1">
-          {navigation?.prevChapter && (
+          {navigation && navigation.prevChapter ? (
             <Link href={`/chapters/${navigation.prevChapter.id}`}>
-              <Button variant="outline" className="flex items-center gap-2">
+              <Button variant="outline" className="flex items-center gap-2 w-full max-w-xs">
                 <IconChevronLeft className="h-4 w-4" />
                 <div className="text-left">
                   <div className="text-sm text-muted-foreground">上一章</div>
+                  <div className="text-xs text-muted-foreground truncate">
+                    {navigation.prevChapter.title}
+                  </div>
                 </div>
               </Button>
             </Link>
+          ) : (
+            <Button variant="outline" disabled className="flex items-center gap-2 w-full max-w-xs">
+              <IconChevronLeft className="h-4 w-4" />
+              <div className="text-left">
+                <div className="text-sm text-muted-foreground">上一章</div>
+                <div className="text-xs text-muted-foreground">已是第一章</div>
+              </div>
+            </Button>
           )}
         </div>
-        
         <div className="flex-1 flex justify-end">
-          {navigation?.nextChapter && (
+          {navigation && navigation.nextChapter ? (
             <Link href={`/chapters/${navigation.nextChapter.id}`}>
-              <Button variant="outline" className="flex items-center gap-2">
+              <Button variant="outline" className="flex items-center gap-2 w-full max-w-xs">
                 <div className="text-right">
                   <div className="text-sm text-muted-foreground">下一章</div>
+                  <div className="text-xs text-muted-foreground truncate">
+                    {navigation.nextChapter.title}
+                  </div>
                 </div>
                 <IconChevronRight className="h-4 w-4" />
               </Button>
             </Link>
+          ) : (
+            <Button variant="outline" disabled className="flex items-center gap-2 w-full max-w-xs justify-end">
+              <div className="text-right">
+                <div className="text-sm text-muted-foreground">下一章</div>
+                <div className="text-xs text-muted-foreground">已是最后一章</div>
+              </div>
+              <IconChevronRight className="h-4 w-4" />
+            </Button>
           )}
         </div>
       </div>

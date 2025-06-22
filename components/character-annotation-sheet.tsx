@@ -170,6 +170,9 @@ export function CharacterAnnotationSheet({
       return response.json()
     },
     onSuccess: (data) => {
+      // 刷新章节数据缓存
+      queryClient.invalidateQueries({ queryKey: ["chapter"] })
+      
       // 检查是否需要显示别名添加提示
       const selectedTextTrimmed = selectedText.trim()
       const character = characters.find(c => c.id === data.characterId)

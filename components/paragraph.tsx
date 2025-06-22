@@ -253,8 +253,6 @@ export function Paragraph({
   }
 
   const renderAnnotatedText = () => {
-    if (!paragraphRef.current) return paragraph.text
-
     const text = paragraph.text
     const elements: React.ReactNode[] = []
     let lastIndex = 0
@@ -267,6 +265,11 @@ export function Paragraph({
       })),
       ...preAnnotations
     ].sort((a, b) => a.startIndex - b.startIndex)
+
+    // 如果没有标注，直接返回原始文本
+    if (allAnnotations.length === 0) {
+      return text
+    }
 
     allAnnotations.forEach((annotation, index) => {
       // 添加标注前的文本
