@@ -32,6 +32,9 @@ interface ParagraphProps {
   annotations: CharacterAnnotation[]
   onAnnotationCreated: (newAnnotation: CharacterAnnotation, updatedCharacter?: Character) => void
   onAnnotationDeleted?: (annotationId: string) => void
+  isSelected?: boolean
+  onParagraphSelect?: (paragraphId: string, isSelected: boolean, event?: React.MouseEvent) => void
+  showSelectionControls?: boolean
 }
 
 export function Paragraph({ 
@@ -41,7 +44,10 @@ export function Paragraph({
   characters, 
   annotations,
   onAnnotationCreated,
-  onAnnotationDeleted
+  onAnnotationDeleted,
+  isSelected,
+  onParagraphSelect,
+  showSelectionControls
 }: ParagraphProps) {
   const [showAnnotationSheet, setShowAnnotationSheet] = useState(false)
   const [selectionInfo, setSelectionInfo] = useState<{
@@ -322,13 +328,27 @@ export function Paragraph({
 
   return (
     <>
-      <p
-        ref={paragraphRef}
-        className={`leading-relaxed ${className}`}
-        onMouseUp={handleMouseUp}
-      >
-        {renderAnnotatedText()}
-      </p>
+      <div className={`relative ${isSelected ? 'bg-blue-50 dark:bg-blue-950/20 border-l-4 border-l-blue-500' : ''}`}>
+        {showSelectionControls && (
+          <div className="absolute left-2 top-2 z-10">
+            <input
+              type="checkbox"
+              checked={isSelected || false}
+              onChange={(e) => onParagraphSelect?.(paragraph.id, e.target.checked)}
+              onClick={(e) => onParagraphSelect?.(paragraph.id, !isSelected, e)}
+              className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+              aria-label={`选择段落 ${paragraph.order + 1}`}
+            />
+          </div>
+        )}
+        <p
+          ref={paragraphRef}
+          className={`leading-relaxed ${className} ${showSelectionControls ? 'pl-8' : ''}`}
+          onMouseUp={handleMouseUp}
+        >
+          {renderAnnotatedText()}
+        </p>
+      </div>
 
       {showAnnotationSheet && selectionInfo && (
         <CharacterAnnotationSheet

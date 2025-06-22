@@ -10,12 +10,17 @@ import {
   volumeSchema,
 } from "@/lib/schemas"
 import { Skeleton } from "@/components/ui/skeleton"
-import { Paragraph } from "@/components/paragraph"
-import { useEffect } from "react"
+import { ParagraphSummarySheet } from "@/components/paragraph-summary-sheet"
+import { useEffect, useMemo, useState } from "react"
 import { toast } from "sonner"
 import { Button } from "@/components/ui/button"
-import { IconChevronLeft, IconChevronRight } from "@tabler/icons-react"
+import {
+  IconChevronLeft,
+  IconChevronRight,
+} from "@tabler/icons-react"
 import Link from "next/link"
+import React from "react"
+import { ParagraphGroup } from "@/components/paragraph-group"
 
 // 角色schema
 const characterSchema = z.object({
@@ -34,6 +39,18 @@ const characterAnnotationSchema = z.object({
   character: characterSchema,
 })
 
+// 段落总结schema
+const paragraphSummarySchema = z.object({
+  id: z.string(),
+  title: z.string(),
+  content: z.string(),
+  startIndex: z.number(),
+  endIndex: z.number(),
+  chapterId: z.string(),
+  createdAt: z.string(),
+  updatedAt: z.string(),
+})
+
 // 扩展的段落schema，包含标注
 const paragraphWithAnnotationsSchema = paragraphSchema.extend({
   annotations: z.array(characterAnnotationSchema),
@@ -49,10 +66,12 @@ const chapterWithDetailsSchema = chapterSchema.extend({
   book: bookWithCharactersSchema,
   volume: volumeSchema,
   paragraphs: z.array(paragraphWithAnnotationsSchema),
+  paragraphSummaries: z.array(paragraphSummarySchema),
 })
 
-type ChapterWithDetails = z.infer<typeof chapterWithDetailsSchema>
-type CharacterAnnotation = z.infer<typeof characterAnnotationSchema>
+export type ChapterWithDetails = z.infer<typeof chapterWithDetailsSchema>
+export type CharacterAnnotation = z.infer<typeof characterAnnotationSchema>
+export type ParagraphSummary = z.infer<typeof paragraphSummarySchema>
 
 // 导航章节schema
 const navigationChapterSchema = z.object({
@@ -113,6 +132,9 @@ export default function ChapterDetailPage() {
 
 function ChapterContent({ id }: { id: string }) {
   const queryClient = useQueryClient()
+  const [selectedParagraphs, setSelectedParagraphs] = useState<Set<string>>(new Set())
+  const [lastSelectedParagraphId, setLastSelectedParagraphId] = useState<string | null>(null)
+  const [showSummarySheet, setShowSummarySheet] = useState(false)
   
   const {
     data: chapter,
@@ -126,6 +148,64 @@ function ChapterContent({ id }: { id: string }) {
     refetchOnWindowFocus: true,
   })
 
+  const paragraphGroups = useMemo(() => {
+    if (!chapter) return []
+
+    const allParagraphs = [...chapter.paragraphs].sort((a, b) => a.order - b.order)
+    if (allParagraphs.length === 0) return []
+
+    const sortedSummaries = [...chapter.paragraphSummaries].sort(
+      (a, b) => a.startIndex - b.startIndex,
+    )
+    const groups: {
+      paragraphs: typeof allParagraphs
+      summary: ParagraphSummary | null
+    }[] = []
+    let currentParagraphIndex = 0
+
+    if (sortedSummaries.length === 0) {
+      groups.push({ paragraphs: allParagraphs, summary: null })
+      return groups.map((g, index) => ({ ...g, id: `group-${index}` }))
+    }
+
+    for (const summary of sortedSummaries) {
+      const paragraphsBefore = []
+      while (
+        currentParagraphIndex < allParagraphs.length &&
+        allParagraphs[currentParagraphIndex].order < summary.startIndex
+      ) {
+        paragraphsBefore.push(allParagraphs[currentParagraphIndex])
+        currentParagraphIndex++
+      }
+      if (paragraphsBefore.length > 0) {
+        groups.push({ paragraphs: paragraphsBefore, summary: null })
+      }
+
+      const paragraphsInSummary = []
+      while (
+        currentParagraphIndex < allParagraphs.length &&
+        allParagraphs[currentParagraphIndex].order <= summary.endIndex
+      ) {
+        paragraphsInSummary.push(allParagraphs[currentParagraphIndex])
+        currentParagraphIndex++
+      }
+      if (paragraphsInSummary.length > 0) {
+        groups.push({ paragraphs: paragraphsInSummary, summary: summary })
+      }
+    }
+
+    const paragraphsAfter = []
+    while (currentParagraphIndex < allParagraphs.length) {
+      paragraphsAfter.push(allParagraphs[currentParagraphIndex])
+      currentParagraphIndex++
+    }
+    if (paragraphsAfter.length > 0) {
+      groups.push({ paragraphs: paragraphsAfter, summary: null })
+    }
+
+    return groups.map((g, index) => ({ ...g, id: `group-${index}` }))
+  }, [chapter])
+
   const {
     data: navigation,
   } = useQuery({
@@ -134,76 +214,161 @@ function ChapterContent({ id }: { id: string }) {
     enabled: !!id,
   })
 
-  // 添加标注到本地状态
-  const addAnnotationToParagraph = (paragraphId: string, newAnnotation: CharacterAnnotation) => {
-    queryClient.setQueryData(["chapter", id], (oldData: ChapterWithDetails | undefined) => {
-      if (!oldData) return oldData
-      
-      return {
-        ...oldData,
-        paragraphs: oldData.paragraphs.map(paragraph => {
-          if (paragraph.id === paragraphId) {
-            return {
-              ...paragraph,
-              annotations: [...paragraph.annotations, newAnnotation]
+  // 处理段落选择，支持 Shift+点击 选择范围
+  const handleParagraphSelect = (paragraphId: string, isSelected: boolean, event?: React.MouseEvent) => {
+    if (event && event.shiftKey && lastSelectedParagraphId && chapter) {
+      // 找到上一次和本次点击的段落索引
+      const allParagraphs = [...chapter.paragraphs].sort((a, b) => a.order - b.order)
+      const idx1 = allParagraphs.findIndex(p => p.id === lastSelectedParagraphId)
+      const idx2 = allParagraphs.findIndex(p => p.id === paragraphId)
+      if (idx1 !== -1 && idx2 !== -1) {
+        const [start, end] = idx1 < idx2 ? [idx1, idx2] : [idx2, idx1]
+        const idsInRange = allParagraphs.slice(start, end + 1).map(p => p.id)
+        setSelectedParagraphs(prev => {
+          const newSet = new Set(prev)
+          idsInRange.forEach(id => {
+            if (isSelected) {
+              newSet.add(id)
+            } else {
+              newSet.delete(id)
             }
-          }
-          return paragraph
+          })
+          return newSet
         })
+        setLastSelectedParagraphId(paragraphId)
+        return
       }
+    }
+    // 普通单选
+    setSelectedParagraphs(prev => {
+      const newSet = new Set(prev)
+      if (isSelected) {
+        newSet.add(paragraphId)
+      } else {
+        newSet.delete(paragraphId)
+      }
+      return newSet
     })
+    setLastSelectedParagraphId(paragraphId)
+  }
+
+  // 获取选中的段落数据
+  const getSelectedParagraphsData = () => {
+    if (!chapter) return []
+    return chapter.paragraphs
+      .filter(p => selectedParagraphs.has(p.id))
+      .map(p => ({
+        id: p.id,
+        text: p.text,
+        order: p.order,
+      }))
+  }
+
+  // 处理总结创建
+  const handleSummaryCreated = (newSummary: ParagraphSummary) => {
+    queryClient.setQueryData(
+      ["chapter", id],
+      (oldData: ChapterWithDetails | undefined) => {
+        if (!oldData) return oldData
+
+        return {
+          ...oldData,
+          paragraphSummaries: [...oldData.paragraphSummaries, newSummary],
+        }
+      },
+    )
+
+    // 清空选择
+    setSelectedParagraphs(new Set())
+  }
+
+  // 添加标注到本地状态
+  const addAnnotationToParagraph = (
+    paragraphId: string,
+    newAnnotation: CharacterAnnotation,
+  ) => {
+    queryClient.setQueryData(
+      ["chapter", id],
+      (oldData: ChapterWithDetails | undefined) => {
+        if (!oldData) return oldData
+
+        return {
+          ...oldData,
+          paragraphs: oldData.paragraphs.map(paragraph => {
+            if (paragraph.id === paragraphId) {
+              return {
+                ...paragraph,
+                annotations: [...paragraph.annotations, newAnnotation],
+              }
+            }
+            return paragraph
+          }),
+        }
+      },
+    )
   }
 
   // 更新角色别名
   const updateCharacterAliases = (characterId: string, newAliases: string[]) => {
-    queryClient.setQueryData(["chapter", id], (oldData: ChapterWithDetails | undefined) => {
-      if (!oldData) return oldData
-      
-      return {
-        ...oldData,
-        book: {
-          ...oldData.book,
-          characters: oldData.book.characters.map(character => {
-            if (character.id === characterId) {
-              return {
-                ...character,
-                aliases: newAliases
+    queryClient.setQueryData(
+      ["chapter", id],
+      (oldData: ChapterWithDetails | undefined) => {
+        if (!oldData) return oldData
+
+        return {
+          ...oldData,
+          book: {
+            ...oldData.book,
+            characters: oldData.book.characters.map(character => {
+              if (character.id === characterId) {
+                return {
+                  ...character,
+                  aliases: newAliases,
+                }
               }
-            }
-            return character
-          })
+              return character
+            }),
+          },
         }
-      }
-    })
+      },
+    )
   }
 
   // 删除标注从本地状态
   const removeAnnotationFromParagraph = async (annotationId: string) => {
     try {
       // 调用API删除标注
-      const response = await fetch(`/api/character-annotations?id=${annotationId}`, {
-        method: 'DELETE',
-      })
-      
+      const response = await fetch(
+        `/api/character-annotations?id=${annotationId}`,
+        {
+          method: "DELETE",
+        },
+      )
+
       if (!response.ok) {
-        throw new Error('删除标注失败')
+        throw new Error("删除标注失败")
       }
-      
+
       // 更新本地缓存
-      queryClient.setQueryData(["chapter", id], (oldData: ChapterWithDetails | undefined) => {
-        if (!oldData) return oldData
-        
-        return {
-          ...oldData,
-          paragraphs: oldData.paragraphs.map(paragraph => {
-            return {
-              ...paragraph,
-              annotations: paragraph.annotations.filter(annotation => annotation.id !== annotationId)
-            }
-          })
-        }
-      })
-      
+      queryClient.setQueryData(
+        ["chapter", id],
+        (oldData: ChapterWithDetails | undefined) => {
+          if (!oldData) return oldData
+
+          return {
+            ...oldData,
+            paragraphs: oldData.paragraphs.map(paragraph => {
+              return {
+                ...paragraph,
+                annotations: paragraph.annotations.filter(
+                  annotation => annotation.id !== annotationId,
+                ),
+              }
+            }),
+          }
+        },
+      )
+
       toast.success("标注已删除")
     } catch (error) {
       toast.error("删除标注失败")
@@ -246,6 +411,8 @@ function ChapterContent({ id }: { id: string }) {
     return null
   }
 
+  const selectedParagraphsData = getSelectedParagraphsData()
+
   return (
     <div className="container mx-auto p-4 md:p-6">
       <div className="mb-8">
@@ -265,32 +432,40 @@ function ChapterContent({ id }: { id: string }) {
         </p>
       </div>
 
-      <article className="prose prose-stone mx-auto dark:prose-invert max-w-none">
-        {chapter.paragraphs.map((p) => (
-          <Paragraph 
-            key={p.id} 
-            paragraph={p} 
+      <h2 className="text-xl font-semibold mb-4">章节内容</h2>
+
+      <div>
+        {paragraphGroups.map((group, index) => (
+          <ParagraphGroup
+            key={group.id}
+            group={group}
+            isLast={index === paragraphGroups.length - 1}
             bookId={chapter.book.id}
             characters={chapter.book.characters}
-            annotations={p.annotations}
-            onAnnotationCreated={(newAnnotation, updatedCharacter) => {
-              // 确保aliases是数组类型
+            selectedParagraphs={selectedParagraphs}
+            totalSelectedCount={selectedParagraphs.size}
+            onCreateSummary={() => setShowSummarySheet(true)}
+            onParagraphSelect={handleParagraphSelect}
+            onAnnotationCreated={(paragraphId, newAnnotation, updatedCharacter) => {
               const annotationWithFixedAliases = {
                 ...newAnnotation,
                 character: {
                   ...newAnnotation.character,
-                  aliases: newAnnotation.character.aliases || []
-                }
+                  aliases: newAnnotation.character.aliases || [],
+                },
               }
-              addAnnotationToParagraph(p.id, annotationWithFixedAliases)
+              addAnnotationToParagraph(paragraphId, annotationWithFixedAliases)
               if (updatedCharacter) {
-                updateCharacterAliases(updatedCharacter.id, updatedCharacter.aliases || [])
+                updateCharacterAliases(
+                  updatedCharacter.id,
+                  updatedCharacter.aliases || [],
+                )
               }
             }}
             onAnnotationDeleted={removeAnnotationFromParagraph}
           />
         ))}
-      </article>
+      </div>
 
       {/* 章节导航 */}
       <div className="mt-12 flex items-center justify-between border-t pt-8">
@@ -341,6 +516,17 @@ function ChapterContent({ id }: { id: string }) {
           )}
         </div>
       </div>
+
+      {/* 总结创建Sheet */}
+      {showSummarySheet && (
+        <ParagraphSummarySheet
+          open={showSummarySheet}
+          onOpenChange={setShowSummarySheet}
+          selectedParagraphs={selectedParagraphsData}
+          chapterId={chapter.id}
+          onSummaryCreated={handleSummaryCreated}
+        />
+      )}
     </div>
   )
 } 

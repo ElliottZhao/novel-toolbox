@@ -55,6 +55,11 @@ export async function GET(
             },
           },
         },
+        paragraphSummaries: {
+          orderBy: {
+            startIndex: "asc",
+          },
+        },
         analysisResult: true,
       },
     })

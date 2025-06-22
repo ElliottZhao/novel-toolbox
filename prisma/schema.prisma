@@ -62,6 +62,7 @@ model Chapter {
 
   analysisResult AnalysisResult?
   paragraphs     Paragraph[]
+  paragraphSummaries ParagraphSummary[]
 
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
@@ -140,4 +141,20 @@ model CharacterAnnotation {
 
   @@index([paragraphId])
   @@index([characterId])
+}
+
+// 段落总结模型
+model ParagraphSummary {
+  id          String   @id @default(cuid())
+  title       String   // 总结标题
+  content     String   @db.Text // 总结内容
+  startIndex  Int      // 起始段落索引
+  endIndex    Int      // 结束段落索引
+  chapterId   String
+  chapter     Chapter  @relation(fields: [chapterId], references: [id], onDelete: Cascade)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([chapterId])
+  @@index([startIndex, endIndex])
 }
