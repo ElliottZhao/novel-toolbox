@@ -1,46 +1,51 @@
-import { clsx, type ClassValue } from "clsx"
+import { type ClassValue, clsx } from "clsx"
 import { twMerge } from "tailwind-merge"
 
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs))
 }
 
-// 角色颜色映射
+// 角色颜色数组
 const characterColors = [
-  { bg: "bg-red-200", darkBg: "dark:bg-red-800", border: "border-red-300", darkBorder: "dark:border-red-600" },
-  { bg: "bg-blue-200", darkBg: "dark:bg-blue-800", border: "border-blue-300", darkBorder: "dark:border-blue-600" },
-  { bg: "bg-green-200", darkBg: "dark:bg-green-800", border: "border-green-300", darkBorder: "dark:border-green-600" },
-  { bg: "bg-yellow-200", darkBg: "dark:bg-yellow-800", border: "border-yellow-300", darkBorder: "dark:border-yellow-600" },
-  { bg: "bg-purple-200", darkBg: "dark:bg-purple-800", border: "border-purple-300", darkBorder: "dark:border-purple-600" },
-  { bg: "bg-pink-200", darkBg: "dark:bg-pink-800", border: "border-pink-300", darkBorder: "dark:border-pink-600" },
-  { bg: "bg-indigo-200", darkBg: "dark:bg-indigo-800", border: "border-indigo-300", darkBorder: "dark:border-indigo-600" },
-  { bg: "bg-orange-200", darkBg: "dark:bg-orange-800", border: "border-orange-300", darkBorder: "dark:border-orange-600" },
-  { bg: "bg-teal-200", darkBg: "dark:bg-teal-800", border: "border-teal-300", darkBorder: "dark:border-teal-600" },
-  { bg: "bg-cyan-200", darkBg: "dark:bg-cyan-800", border: "border-cyan-300", darkBorder: "dark:border-cyan-600" },
+  "bg-red-100 text-red-800 border-red-200",
+  "bg-blue-100 text-blue-800 border-blue-200",
+  "bg-green-100 text-green-800 border-green-200",
+  "bg-yellow-100 text-yellow-800 border-yellow-200",
+  "bg-purple-100 text-purple-800 border-purple-200",
+  "bg-pink-100 text-pink-800 border-pink-200",
+  "bg-indigo-100 text-indigo-800 border-indigo-200",
+  "bg-gray-100 text-gray-800 border-gray-200",
+  "bg-orange-100 text-orange-800 border-orange-200",
+  "bg-teal-100 text-teal-800 border-teal-200",
 ]
 
-// 预标注下划线颜色
+// 预标注颜色（稍微淡一些）
 const preAnnotationColors = [
-  "border-b-2 border-red-400 dark:border-red-500",
-  "border-b-2 border-blue-400 dark:border-blue-500",
-  "border-b-2 border-green-400 dark:border-green-500",
-  "border-b-2 border-yellow-400 dark:border-yellow-500",
-  "border-b-2 border-purple-400 dark:border-purple-500",
-  "border-b-2 border-pink-400 dark:border-pink-500",
-  "border-b-2 border-indigo-400 dark:border-indigo-500",
-  "border-b-2 border-orange-400 dark:border-orange-500",
-  "border-b-2 border-teal-400 dark:border-teal-500",
-  "border-b-2 border-cyan-400 dark:border-cyan-500",
+  "bg-red-50 text-red-600 border-red-100",
+  "bg-blue-50 text-blue-600 border-blue-100",
+  "bg-green-50 text-green-600 border-green-100",
+  "bg-yellow-50 text-yellow-600 border-yellow-100",
+  "bg-purple-50 text-purple-600 border-purple-100",
+  "bg-pink-50 text-pink-600 border-pink-100",
+  "bg-indigo-50 text-indigo-600 border-indigo-100",
+  "bg-gray-50 text-gray-600 border-gray-100",
+  "bg-orange-50 text-orange-600 border-orange-100",
+  "bg-teal-50 text-teal-600 border-teal-100",
 ]
 
-// 为角色分配颜色的函数
-export function getCharacterColor(characterId: number, isPreAnnotation: boolean = false) {
-  const colorIndex = characterId % characterColors.length
-  
-  if (isPreAnnotation) {
-    return preAnnotationColors[colorIndex]
+// 简单的字符串哈希函数
+function hashString(str: string): number {
+  let hash = 0
+  for (let i = 0; i < str.length; i++) {
+    const char = str.charCodeAt(i)
+    hash = ((hash << 5) - hash) + char
+    hash = hash & hash // Convert to 32-bit integer
   }
-  
-  const color = characterColors[colorIndex]
-  return `${color.bg} ${color.darkBg} ${color.border} ${color.darkBorder}`
+  return Math.abs(hash)
+}
+
+export function getCharacterColor(characterId: string, isPreAnnotation: boolean = false) {
+  const colors = isPreAnnotation ? preAnnotationColors : characterColors
+  const colorIndex = hashString(characterId) % colors.length
+  return colors[colorIndex]
 }

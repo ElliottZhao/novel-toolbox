@@ -5,8 +5,8 @@ import { z } from "zod"
 
 const createChapterSchema = z.object({
   title: z.string().min(1, "Title is required."),
-  bookId: z.number().int().positive("A valid book ID is required."),
-  volumeId: z.number().int().positive("A valid volume ID is required."),
+  bookId: z.string().min(1, "A valid book ID is required."),
+  volumeId: z.string().min(1, "A valid volume ID is required."),
   index: z.number().int(),
 })
 
@@ -16,7 +16,7 @@ export async function GET(request: Request) {
 
   try {
     const chapters = await prisma.chapter.findMany({
-      where: bookId ? { bookId: Number(bookId) } : {},
+      where: bookId ? { bookId } : {},
       include: {
         book: {
           select: {

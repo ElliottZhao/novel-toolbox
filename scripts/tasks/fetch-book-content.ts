@@ -19,7 +19,7 @@ async function fetchPage(url: string, cookie?: string): Promise<string> {
 }
 
 async function fetchChapterContent(
-  chapter: { id: number; fanqie_chapter_id: string | null },
+  chapter: { id: string; fanqie_chapter_id: string | null },
   prisma: PrismaClient,
 ) {
   if (!chapter.fanqie_chapter_id) {
@@ -96,19 +96,18 @@ async function fetchChapterContent(
 }
 
 export async function handleFetchBookContent(job: Job<FetchBookContentData>, prisma: PrismaClient) {
-  const bookId = Number(job.data.bookId);
-  console.log(`Fetching content for book ${bookId}`);
+  console.log(`Fetching content for book ${job.data.bookId}`);
 
   const chaptersToFetch = await prisma.chapter.findMany({
     where: {
       status: "EMPTY",
-      ...(bookId && { bookId: parseInt(bookId.toString(), 10) }),
+      ...(job.data.bookId && { bookId: job.data.bookId }),
     },
     take: 10,
   });
 
   if (chaptersToFetch.length === 0) {
-    console.log(`No chapters to fetch for book ${bookId}`);
+    console.log(`No chapters to fetch for book ${job.data.bookId}`);
     await job.updateProgress(100);
     return;
   }
@@ -125,25 +124,24 @@ export async function handleFetchBookContent(job: Job<FetchBookContentData>, pri
     await job.updateProgress(progress);
   }
 
-  console.log(`Finished fetching content for book ${bookId}.`);
+  console.log(`Finished fetching content for book ${job.data.bookId}.`);
 }
 
 export async function handleFetchSingleChapterContent(
   job: Job<FetchSingleChapterContentData>,
   prisma: PrismaClient,
 ) {
-  const { chapterId } = job.data;
-  console.log(`Fetching content for single chapter ${chapterId}`);
+  console.log(`Fetching content for single chapter ${job.data.chapterId}`);
 
   const chapter = await prisma.chapter.findUnique({
-    where: { id: chapterId },
+    where: { id: job.data.chapterId },
   });
 
   if (!chapter) {
-    console.error(`Chapter with id ${chapterId} not found.`);
-    throw new Error(`Chapter with id ${chapterId} not found.`);
+    console.error(`Chapter with id ${job.data.chapterId} not found.`);
+    throw new Error(`Chapter with id ${job.data.chapterId} not found.`);
   }
 
   await fetchChapterContent(chapter, prisma);
-  console.log(`Finished fetching content for single chapter ${chapterId}.`);
+  console.log(`Finished fetching content for single chapter ${job.data.chapterId}.`);
 } 

@@ -1,24 +1,23 @@
 "use client"
 
-import { useState, useRef, useMemo } from "react"
+import React, { useState, useRef, useMemo } from "react"
 import { paragraphSchema } from "@/lib/schemas"
 import { z } from "zod"
-import { CharacterAnnotationSheet } from "@/components/character-annotation-sheet"
+import { CharacterAnnotationSheet } from "./character-annotation-sheet"
 import { getCharacterColor } from "@/lib/utils"
-import { IconX } from "@tabler/icons-react"
 import { toast } from "sonner"
 
 type Paragraph = z.infer<typeof paragraphSchema>
 
 interface Character {
-  id: number
+  id: string
   name: string
   description?: string | null
   aliases?: string[]
 }
 
 interface CharacterAnnotation {
-  id: number
+  id: string
   startIndex: number
   endIndex: number
   selectedText: string
@@ -28,11 +27,11 @@ interface CharacterAnnotation {
 interface ParagraphProps {
   paragraph: Paragraph
   className?: string
-  bookId: number
+  bookId: string
   characters: Character[]
   annotations: CharacterAnnotation[]
   onAnnotationCreated: (newAnnotation: CharacterAnnotation, updatedCharacter?: Character) => void
-  onAnnotationDeleted?: (annotationId: number) => void
+  onAnnotationDeleted?: (annotationId: string) => void
 }
 
 export function Paragraph({ 
@@ -44,7 +43,6 @@ export function Paragraph({
   onAnnotationCreated,
   onAnnotationDeleted
 }: ParagraphProps) {
-  const [selectedText, setSelectedText] = useState("")
   const [showAnnotationSheet, setShowAnnotationSheet] = useState(false)
   const [selectionInfo, setSelectionInfo] = useState<{
     startIndex: number
@@ -56,9 +54,10 @@ export function Paragraph({
   // 预标注：查找未标注但匹配角色名称的文本
   const preAnnotations = useMemo(() => {
     const preAnnotated: Array<{
+      id: string
       startIndex: number
       endIndex: number
-      text: string
+      selectedText: string
       character: Character
       isPreAnnotation: true
     }> = []
@@ -107,9 +106,10 @@ export function Paragraph({
           
           if (!isOverlappingWithAnnotations && !isOverlappingWithMatched) {
             preAnnotated.push({
+              id: `pre-${character.id}-${lastIndex}`,
               startIndex: lastIndex,
               endIndex: endIndex,
-              text: searchTerm,
+              selectedText: searchTerm,
               character: character,
               isPreAnnotation: true
             })
@@ -192,7 +192,6 @@ export function Paragraph({
         const fallbackEndIndex = fallbackStartIndex + selectedText.length
         
         if (fallbackStartIndex !== -1) {
-          setSelectedText(selectedText)
           setShowAnnotationSheet(true)
           setSelectionInfo({
             startIndex: fallbackStartIndex,
@@ -203,7 +202,6 @@ export function Paragraph({
         return
       }
       
-      setSelectedText(selectedText)
       setShowAnnotationSheet(true)
       
       setSelectionInfo({
@@ -221,9 +219,7 @@ export function Paragraph({
         return
       }
 
-      setSelectedText(selectedText)
       setShowAnnotationSheet(true)
-      
       setSelectionInfo({
         startIndex,
         endIndex,
@@ -232,88 +228,75 @@ export function Paragraph({
     }
   }
 
-  // 处理预标注点击
   const handlePreAnnotationClick = (preAnnotation: typeof preAnnotations[0]) => {
-    setSelectedText(preAnnotation.text)
     setShowAnnotationSheet(true)
     setSelectionInfo({
       startIndex: preAnnotation.startIndex,
       endIndex: preAnnotation.endIndex,
-      selectedText: preAnnotation.text
+      selectedText: preAnnotation.selectedText
     })
   }
 
-  // 删除标注
-  const handleDeleteAnnotation = async (annotationId: number, event: React.MouseEvent) => {
-    event.stopPropagation() // 阻止事件冒泡
+  const handleDeleteAnnotation = async (annotationId: string, event: React.MouseEvent) => {
+    event.preventDefault()
+    event.stopPropagation()
+    
+    if (!onAnnotationDeleted) return
     
     try {
-      const response = await fetch(`/api/character-annotations?id=${annotationId}`, {
-        method: "DELETE",
-      })
-      
-      if (!response.ok) {
-        const error = await response.json()
-        throw new Error(error.error || "删除标注失败")
-      }
-      
-      // 调用父组件的回调函数更新状态
-      if (onAnnotationDeleted) {
-        onAnnotationDeleted(annotationId)
-      }
-      
-      toast.success("标注删除成功")
+      await onAnnotationDeleted(annotationId)
+      toast.success("标注已删除")
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "删除标注失败")
+      toast.error("删除标注失败")
+      console.error("Delete annotation error:", error)
     }
   }
 
-  // 渲染带标注的文本
   const renderAnnotatedText = () => {
-    // 合并已标注和预标注，按位置排序
-    const allAnnotations = [
-      ...annotations.map(a => ({ ...a, isPreAnnotation: false as const })),
-      ...preAnnotations
-    ].sort((a, b) => a.startIndex - b.startIndex)
-    
-    if (allAnnotations.length === 0) {
-      return paragraph.text
-    }
-    
-    const parts: React.ReactNode[] = []
+    if (!paragraphRef.current) return paragraph.text
+
+    const text = paragraph.text
+    const elements: React.ReactNode[] = []
     let lastIndex = 0
 
-    allAnnotations.forEach((annotation) => {
+    // 合并所有标注和预标注，按位置排序
+    const allAnnotations = [
+      ...annotations.map(a => ({
+        ...a,
+        isPreAnnotation: false as const
+      })),
+      ...preAnnotations
+    ].sort((a, b) => a.startIndex - b.startIndex)
+
+    allAnnotations.forEach((annotation, index) => {
       // 添加标注前的文本
       if (annotation.startIndex > lastIndex) {
-        parts.push(
-          <span key={`text-${lastIndex}`}>
-            {paragraph.text.slice(lastIndex, annotation.startIndex)}
+        elements.push(
+          <span key={`text-${index}`}>
+            {text.slice(lastIndex, annotation.startIndex)}
           </span>
         )
       }
 
-      // 添加标注的文本
-      const isPreAnnotation = 'isPreAnnotation' in annotation && annotation.isPreAnnotation
-      const colorClasses = getCharacterColor(annotation.character.id, isPreAnnotation)
-      
-      parts.push(
+      // 添加标注文本
+      const colorClass = getCharacterColor(annotation.character.id, annotation.isPreAnnotation)
+      elements.push(
         <span
-          key={`annotation-${isPreAnnotation ? `pre-${annotation.startIndex}` : annotation.id}`}
-          className={`relative group cursor-pointer hover:opacity-80 ${colorClasses}`}
-          title={`${isPreAnnotation ? '预标注 - ' : ''}角色: ${annotation.character.name}`}
-          onClick={isPreAnnotation ? () => handlePreAnnotationClick(annotation) : undefined}
+          key={`annotation-${index}`}
+          className={`${colorClass} cursor-pointer rounded px-1 py-0.5 ${
+            annotation.isPreAnnotation ? 'border-dashed' : 'border-solid'
+          } border`}
+          onClick={annotation.isPreAnnotation ? () => handlePreAnnotationClick(annotation) : undefined}
+          title={annotation.isPreAnnotation ? `点击标注: ${annotation.character.name}` : annotation.character.name}
         >
-          {paragraph.text.slice(annotation.startIndex, annotation.endIndex)}
-          
-          {/* 删除按钮 - 只对已标注的文本显示 */}
-          {!isPreAnnotation && (
+          {annotation.selectedText}
+          {!annotation.isPreAnnotation && onAnnotationDeleted && (
             <button
-              className="absolute -top-1 -right-1 bg-red-500 hover:bg-red-600 text-white rounded-full w-4 h-4 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity text-xs"
+              className="ml-1 text-xs opacity-50 hover:opacity-100"
               onClick={(e) => handleDeleteAnnotation(annotation.id, e)}
               title="删除标注"
             >
-              <IconX size={10} />
+              ×
             </button>
           )}
         </span>
@@ -323,38 +306,44 @@ export function Paragraph({
     })
 
     // 添加剩余的文本
-    if (lastIndex < paragraph.text.length) {
-      parts.push(
-        <span key={`text-${lastIndex}`}>
-          {paragraph.text.slice(lastIndex)}
+    if (lastIndex < text.length) {
+      elements.push(
+        <span key="text-end">
+          {text.slice(lastIndex)}
         </span>
       )
     }
 
-    return parts
+    return elements
   }
 
   return (
     <>
-      <p 
+      <p
         ref={paragraphRef}
-        className={`leading-relaxed select-text ${className}`}
-        data-paragraph-id={paragraph.id}
+        className={`leading-relaxed ${className}`}
         onMouseUp={handleMouseUp}
       >
         {renderAnnotatedText()}
       </p>
 
-      <CharacterAnnotationSheet
-        open={showAnnotationSheet}
-        onOpenChange={setShowAnnotationSheet}
-        selectedText={selectedText}
-        paragraphId={paragraph.id}
-        bookId={bookId}
-        characters={characters}
-        selectionInfo={selectionInfo}
-        onAnnotationCreated={onAnnotationCreated}
-      />
+      {showAnnotationSheet && selectionInfo && (
+        <CharacterAnnotationSheet
+          open={showAnnotationSheet}
+          onOpenChange={setShowAnnotationSheet}
+          selectedText={selectionInfo.selectedText}
+          startIndex={selectionInfo.startIndex}
+          endIndex={selectionInfo.endIndex}
+          paragraphId={paragraph.id}
+          bookId={bookId}
+          characters={characters}
+          onAnnotationCreated={(newAnnotation, updatedCharacter) => {
+            onAnnotationCreated(newAnnotation, updatedCharacter)
+            setShowAnnotationSheet(false)
+            setSelectionInfo(null)
+          }}
+        />
+      )}
     </>
   )
 } 

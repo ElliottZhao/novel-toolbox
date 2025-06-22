@@ -17,7 +17,7 @@ datasource db {
 // 3. Define the Book model.
 // This model corresponds to the data in `app/api/books/route.ts`.
 model Book {
-  id             Int        @id @default(autoincrement())
+  id             String     @id @default(cuid())
   title          String?
   author         String?
   fanqie_book_id String     @unique
@@ -30,10 +30,10 @@ model Book {
 }
 
 model Volume {
-  id      Int       @id @default(autoincrement())
+  id      String    @id @default(cuid())
   title   String
   index   Int
-  bookId  Int
+  bookId  String
   book    Book      @relation(fields: [bookId], references: [id], onDelete: Cascade)
   chapters Chapter[]
 
@@ -48,16 +48,16 @@ model Volume {
 // This model corresponds to the data in `app/api/chapters/route.ts`.
 // It includes a relation to the Book model.
 model Chapter {
-  id                Int       @id @default(autoincrement())
+  id                String        @id @default(cuid())
   title             String
   index             Int
-  fanqie_chapter_id String?   @unique
+  fanqie_chapter_id String?       @unique
   status            ChapterStatus @default(EMPTY)
-  addedAt           DateTime  @default(now())
+  addedAt           DateTime      @default(now())
 
-  bookId    Int
+  bookId    String
   book      Book      @relation(fields: [bookId], references: [id], onDelete: Cascade)
-  volumeId  Int
+  volumeId  String
   volume    Volume    @relation(fields: [volumeId], references: [id], onDelete: Cascade)
 
   analysisResult AnalysisResult?
@@ -68,10 +68,10 @@ model Chapter {
 }
 
 model Paragraph {
-  id        Int      @id @default(autoincrement())
+  id        String   @id @default(cuid())
   text      String   @db.Text
   order     Int
-  chapterId Int
+  chapterId String
   chapter   Chapter  @relation(fields: [chapterId], references: [id], onDelete: Cascade)
   annotations CharacterAnnotation[]
   createdAt DateTime @default(now())
@@ -84,12 +84,12 @@ model Paragraph {
 // This model will store the results of chapter analysis,
 // corresponding to concepts like "plotAbstractions" in `app/api/stats/route.ts`.
 model AnalysisResult {
-  id               Int      @id @default(autoincrement())
+  id               String   @id @default(cuid())
   plotAbstractions Json? // Flexible JSON field to store various analysis outputs.
   summary          String?
   analyzedAt       DateTime @default(now())
 
-  chapterId Int     @unique
+  chapterId String  @unique
   chapter   Chapter @relation(fields: [chapterId], references: [id], onDelete: Cascade)
 
   createdAt DateTime @default(now())
@@ -112,31 +112,31 @@ enum ChapterStatus {
 
 // 角色模型
 model Character {
-  id          Int       @id @default(autoincrement())
+  id          String   @id @default(cuid())
   name        String
   description String?
-  aliases     String[]  @default([]) // 角色别名数组
-  bookId      Int
-  book        Book      @relation(fields: [bookId], references: [id], onDelete: Cascade)
+  aliases     String[] @default([]) // 角色别名数组
+  bookId      String
+  book        Book     @relation(fields: [bookId], references: [id], onDelete: Cascade)
   annotations CharacterAnnotation[]
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 
   @@unique([bookId, name])
 }
 
 // 角色标注模型
 model CharacterAnnotation {
-  id          Int       @id @default(autoincrement())
-  startIndex  Int       // 文本在段落中的起始位置
-  endIndex    Int       // 文本在段落中的结束位置
-  selectedText String   // 选中的文本内容
-  characterId Int
+  id          String   @id @default(cuid())
+  startIndex  Int      // 文本在段落中的起始位置
+  endIndex    Int      // 文本在段落中的结束位置
+  selectedText String  // 选中的文本内容
+  characterId String
   character   Character @relation(fields: [characterId], references: [id], onDelete: Cascade)
-  paragraphId Int
+  paragraphId String
   paragraph   Paragraph @relation(fields: [paragraphId], references: [id], onDelete: Cascade)
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 
   @@index([paragraphId])
   @@index([characterId])

@@ -35,7 +35,7 @@ export const columns = (onAction: (bookId: string, taskType: string) => void): C
       const book = row.original
       return (
         <Link href={`/chapters?bookId=${book.id}`} className="hover:underline">
-          {book.title}
+          {book.title || `书籍 ${book.fanqie_book_id}`}
         </Link>
       )
     },

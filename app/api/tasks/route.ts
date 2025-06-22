@@ -1,30 +1,30 @@
 import { NextResponse } from 'next/server';
 import { taskQueue } from '@/lib/queue';
-import { FETCH_CATALOG_TASK, FETCH_BOOK_CONTENT_TASK } from '@/lib/tasks';
 import { z } from 'zod';
 
-const taskSchema = z.object({
-  taskType: z.enum([FETCH_CATALOG_TASK, FETCH_BOOK_CONTENT_TASK]),
-  bookId: z.string(),
+const createTaskSchema = z.object({
+  taskType: z.string().min(1, "Task type is required"),
+  bookId: z.string().min(1, "Book ID is required"),
 });
 
-export async function GET(request: Request) {
+export async function GET() {
   try {
-    const jobs = await taskQueue.getJobs(['active', 'waiting']);
-    const jobStatuses = await Promise.all(
-      jobs.map(async (job) => ({
-        id: job.id,
-        state: await job.getState(),
-        progress: job.progress,
-        returnValue: job.returnvalue,
-      }))
-    );
-    return NextResponse.json(jobStatuses);
+    const jobs = await taskQueue.getJobs(['waiting', 'active', 'completed', 'failed']);
+    
+    const jobData = await Promise.all(jobs.map(async job => ({
+      id: job.id,
+      name: job.name,
+      data: job.data,
+      status: await job.getState(),
+      progress: job.progress(),
+      timestamp: job.timestamp,
+    })));
+
+    return NextResponse.json(jobData);
   } catch (error) {
-    console.error(error);
-    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    console.error("Failed to fetch tasks:", error);
     return NextResponse.json(
-      { error: 'Failed to get tasks', details: errorMessage },
+      { error: "Failed to fetch tasks" },
       { status: 500 }
     );
   }
@@ -32,12 +32,12 @@ export async function GET(request: Request) {
 
 export async function POST(request: Request) {
   try {
-    const body = await request.json();
-    const validation = taskSchema.safeParse(body);
+    const json = await request.json();
+    const validation = createTaskSchema.safeParse(json);
 
     if (!validation.success) {
       return NextResponse.json(
-        { error: 'Invalid request body', details: validation.error.errors },
+        { error: "Invalid request data", details: validation.error.issues },
         { status: 400 }
       );
     }
@@ -46,12 +46,19 @@ export async function POST(request: Request) {
 
     const job = await taskQueue.add(taskType, { bookId });
 
-    return NextResponse.json({ jobId: job.id });
-  } catch (error) {
-    console.error(error);
-    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
     return NextResponse.json(
-      { error: 'Failed to create task', details: errorMessage },
+      {
+        message: "Task queued successfully",
+        jobId: job.id,
+        taskType,
+        bookId,
+      },
+      { status: 201 }
+    );
+  } catch (error) {
+    console.error("Failed to queue task:", error);
+    return NextResponse.json(
+      { error: "Failed to queue task" },
       { status: 500 }
     );
   }

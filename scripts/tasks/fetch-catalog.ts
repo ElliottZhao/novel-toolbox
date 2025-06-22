@@ -4,11 +4,10 @@ import { extractInitialState } from './fanqie-utils'
 import type { FetchCatalogData } from '../worker'
 
 export async function handleFetchCatalog(job: Job<FetchCatalogData>, prisma: PrismaClient) {
-  const bookId = Number(job.data.bookId)
-  console.log(`Fetching catalog for book ${bookId}`)
-  const book = await prisma.book.findUnique({ where: { id: bookId } })
+  console.log(`Fetching catalog for book ${job.data.bookId}`)
+  const book = await prisma.book.findUnique({ where: { id: job.data.bookId } })
   if (!book || !book.fanqie_book_id) {
-    throw new Error(`Book or fanqie_book_id not found for bookId: ${bookId}`)
+    throw new Error(`Book or fanqie_book_id not found for bookId: ${job.data.bookId}`)
   }
 
   const url = `https://fanqienovel.com/page/${book.fanqie_book_id}`
@@ -35,16 +34,16 @@ export async function handleFetchCatalog(job: Job<FetchCatalogData>, prisma: Pri
     const authorName = initialState?.page?.authorName
     if (bookName && authorName) {
       await prisma.book.update({
-        where: { id: bookId },
+        where: { id: job.data.bookId },
         data: { title: bookName, author: authorName },
       })
       console.log(`Updated book title to "${bookName}" and author to "${authorName}".`)
     }
 
-    const chapterListWithVolume: any[] = initialState?.page?.chapterListWithVolume
+    const chapterListWithVolume: {volume_name: string, itemId: string, title: string}[][] = initialState?.page?.chapterListWithVolume
     if (Array.isArray(chapterListWithVolume)) {
       const existingChapters = await prisma.chapter.findMany({
-        where: { bookId: bookId },
+        where: { bookId: job.data.bookId },
         select: { fanqie_chapter_id: true },
       })
       const existingFanqieIds = new Set(
@@ -56,10 +55,10 @@ export async function handleFetchCatalog(job: Job<FetchCatalogData>, prisma: Pri
         const volumeName = volumeData?.[0]?.volume_name
         if (!volumeName) continue
         const volume = await prisma.volume.upsert({
-          where: { bookId_title: { bookId: bookId, title: volumeName } },
+          where: { bookId_title: { bookId: job.data.bookId, title: volumeName } },
           update: {},
           create: {
-            bookId: bookId,
+            bookId: job.data.bookId,
             title: volumeName,
             index: volumeIndex,
           },
@@ -77,7 +76,7 @@ export async function handleFetchCatalog(job: Job<FetchCatalogData>, prisma: Pri
 
             await prisma.chapter.create({
               data: {
-                bookId: bookId,
+                bookId: job.data.bookId,
                 volumeId: volume.id,
                 title: chapterData.title,
                 index: chapterIndex,

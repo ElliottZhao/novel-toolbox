@@ -6,25 +6,36 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> }
 ) {
   const { id } = await params
-  const chapterId = parseInt(id, 10)
-  if (isNaN(chapterId)) {
-    return NextResponse.json({ error: "Invalid chapter ID" }, { status: 400 })
-  }
 
   try {
     const chapter = await prisma.chapter.findUnique({
-      where: { id: chapterId },
+      where: { id },
       include: {
         book: {
-          include: {
+          select: {
+            id: true,
+            title: true,
+            author: true,
+            fanqie_book_id: true,
+            status: true,
             characters: {
-              orderBy: {
-                name: "asc",
+              select: {
+                id: true,
+                name: true,
+                description: true,
+                aliases: true,
               },
             },
           },
         },
-        volume: true,
+        volume: {
+          select: {
+            id: true,
+            title: true,
+            index: true,
+            bookId: true,
+          },
+        },
         paragraphs: {
           orderBy: {
             order: "asc",
@@ -32,26 +43,34 @@ export async function GET(
           include: {
             annotations: {
               include: {
-                character: true,
-              },
-              orderBy: {
-                startIndex: "asc",
+                character: {
+                  select: {
+                    id: true,
+                    name: true,
+                    description: true,
+                    aliases: true,
+                  },
+                },
               },
             },
           },
         },
+        analysisResult: true,
       },
     })
 
     if (!chapter) {
-      return NextResponse.json({ error: "Chapter not found" }, { status: 404 })
+      return NextResponse.json(
+        { error: "Chapter not found" },
+        { status: 404 }
+      )
     }
 
     return NextResponse.json(chapter)
   } catch (error) {
     console.error("Failed to fetch chapter:", error)
     return NextResponse.json(
-      { error: "Internal Server Error" },
+      { error: "Failed to fetch chapter" },
       { status: 500 }
     )
   }

@@ -19,7 +19,7 @@ import Link from "next/link"
 
 // 角色schema
 const characterSchema = z.object({
-  id: z.number(),
+  id: z.string(),
   name: z.string(),
   description: z.string().nullable().optional(),
   aliases: z.array(z.string()).optional().default([]),
@@ -27,7 +27,7 @@ const characterSchema = z.object({
 
 // 角色标注schema
 const characterAnnotationSchema = z.object({
-  id: z.number(),
+  id: z.string(),
   startIndex: z.number(),
   endIndex: z.number(),
   selectedText: z.string(),
@@ -56,7 +56,7 @@ type CharacterAnnotation = z.infer<typeof characterAnnotationSchema>
 
 // 导航章节schema
 const navigationChapterSchema = z.object({
-  id: z.number(),
+  id: z.string(),
   title: z.string(),
   volume: volumeSchema,
   book: bookSchema,
@@ -134,7 +134,7 @@ function ChapterContent({ id }: { id: string }) {
   })
 
   // 添加标注到本地状态
-  const addAnnotationToParagraph = (paragraphId: number, newAnnotation: CharacterAnnotation) => {
+  const addAnnotationToParagraph = (paragraphId: string, newAnnotation: CharacterAnnotation) => {
     queryClient.setQueryData(["chapter", id], (oldData: ChapterWithDetails | undefined) => {
       if (!oldData) return oldData
       
@@ -154,7 +154,7 @@ function ChapterContent({ id }: { id: string }) {
   }
 
   // 更新角色别名
-  const updateCharacterAliases = (characterId: number, newAliases: string[]) => {
+  const updateCharacterAliases = (characterId: string, newAliases: string[]) => {
     queryClient.setQueryData(["chapter", id], (oldData: ChapterWithDetails | undefined) => {
       if (!oldData) return oldData
       
@@ -177,7 +177,7 @@ function ChapterContent({ id }: { id: string }) {
   }
 
   // 删除标注从本地状态
-  const removeAnnotationFromParagraph = (annotationId: number) => {
+  const removeAnnotationFromParagraph = (annotationId: string) => {
     queryClient.setQueryData(["chapter", id], (oldData: ChapterWithDetails | undefined) => {
       if (!oldData) return oldData
       

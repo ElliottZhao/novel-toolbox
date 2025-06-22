@@ -68,7 +68,7 @@ import {
 import { Chapter, chapterSchema } from "@/lib/schemas"
 import { cn } from "@/lib/utils"
 
-async function getChapters(bookId?: number): Promise<Chapter[]> {
+async function getChapters(bookId?: string): Promise<Chapter[]> {
   const url = bookId ? `/api/chapters?bookId=${bookId}` : "/api/chapters"
   const response = await fetch(url)
   if (!response.ok) {
@@ -78,7 +78,7 @@ async function getChapters(bookId?: number): Promise<Chapter[]> {
   return z.array(chapterSchema).parse(data)
 }
 
-async function downloadChapter(chapterId: number) {
+async function downloadChapter(chapterId: string) {
   const response = await fetch(`/api/chapters/${chapterId}/download`, {
     method: "POST",
   })
@@ -91,12 +91,12 @@ async function downloadChapter(chapterId: number) {
   return response.json()
 }
 
-type DownloadFunction = (chapterId: number) => void
+type DownloadFunction = (chapterId: string) => void
 
 const getColumns = (
   downloadChapter: DownloadFunction,
   isPending: boolean,
-  pendingChapterId?: number,
+  pendingChapterId?: string,
 ): ColumnDef<Chapter>[] => [
   {
     id: "select",
@@ -223,10 +223,10 @@ const getColumns = (
   },
 ]
 
-export function ChaptersDataTable({ bookId }: { bookId?: number }) {
+export function ChaptersDataTable({ bookId }: { bookId?: string }) {
   const queryClient = useQueryClient()
 
-  const downloadMutation = useMutation<unknown, Error, number>({
+  const downloadMutation = useMutation<unknown, Error, string>({
     mutationFn: downloadChapter,
     onSuccess: () => {
       toast.success("章节下载任务已加入队列。")

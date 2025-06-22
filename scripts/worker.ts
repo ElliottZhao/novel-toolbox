@@ -19,12 +19,12 @@ const connection = new IORedis(process.env.REDIS_URL || 'redis://127.0.0.1:6379'
 });
 
 interface BaseTaskData {
-  bookId: number;
+  bookId: string;
 }
 export interface FetchCatalogData extends BaseTaskData {}
 export interface FetchBookContentData extends BaseTaskData {}
 export interface FetchSingleChapterContentData {
-  chapterId: number;
+  chapterId: string;
 }
 
 export type TaskData =

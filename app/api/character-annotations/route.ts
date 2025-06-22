@@ -6,8 +6,8 @@ const createAnnotationSchema = z.object({
   startIndex: z.number().int().min(0),
   endIndex: z.number().int().min(0),
   selectedText: z.string().min(1),
-  characterId: z.number().int().positive(),
-  paragraphId: z.number().int().positive(),
+  characterId: z.string().min(1),
+  paragraphId: z.string().min(1),
 })
 
 export async function POST(request: NextRequest) {
@@ -141,7 +141,7 @@ export async function GET(request: NextRequest) {
 
     const annotations = await prisma.characterAnnotation.findMany({
       where: {
-        paragraphId: parseInt(paragraphId),
+        paragraphId: paragraphId,
       },
       include: {
         character: true,
@@ -175,7 +175,7 @@ export async function DELETE(request: NextRequest) {
 
     // 验证标注是否存在
     const annotation = await prisma.characterAnnotation.findUnique({
-      where: { id: parseInt(annotationId) },
+      where: { id: annotationId },
     })
 
     if (!annotation) {
@@ -187,7 +187,7 @@ export async function DELETE(request: NextRequest) {
 
     // 删除标注
     await prisma.characterAnnotation.delete({
-      where: { id: parseInt(annotationId) },
+      where: { id: annotationId },
     })
 
     return NextResponse.json({ message: "标注删除成功" })
