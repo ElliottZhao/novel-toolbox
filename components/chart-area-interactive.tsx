@@ -12,7 +12,7 @@ import {
   XAxis,
   YAxis,
 } from "recharts"
-import { chartConfig, ChartTooltipContent } from "@/components/ui/chart"
+import { ChartTooltipContent } from "@/components/ui/chart"
 
 async function getChartData() {
   const res = await fetch("/api/chart-data")

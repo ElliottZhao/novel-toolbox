@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { useMutation, useQueryClient } from "@tanstack/react-query"
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet"
 import { Button } from "@/components/ui/button"
@@ -56,6 +56,13 @@ export function CharacterAnnotationSheet({
   const [showCreateForm, setShowCreateForm] = useState(false)
   const queryClient = useQueryClient()
 
+  // 自动填充角色名称
+  useEffect(() => {
+    if (showCreateForm) {
+      setNewCharacterName(selectedText)
+    }
+  }, [showCreateForm, selectedText])
+
   // 检查选中文本是否与角色名称匹配
   const getCharacterMatchScore = (character: Character, selectedText: string) => {
     const cleanSelected = selectedText.trim()
@@ -101,6 +108,14 @@ export function CharacterAnnotationSheet({
     .sort((a, b) => b.score - a.score)
 
   const bestMatch = matchedCharacters[0]
+
+  // 获取未匹配的角色
+  const unmatchedCharacters = characters
+    .filter(character => !matchedCharacters.some(matched => matched.character.id === character.id))
+    .map(character => ({
+      character,
+      score: 0
+    }))
 
   // 创建新角色
   const createCharacterMutation = useMutation({
@@ -236,12 +251,12 @@ export function CharacterAnnotationSheet({
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent className="w-[400px] sm:w-[540px]">
+      <SheetContent className="w-[400px] sm:w-[540px] flex flex-col">
         <SheetHeader>
           <SheetTitle>角色标注</SheetTitle>
         </SheetHeader>
         
-        <div className="mt-6 space-y-4">
+        <div className="mt-6 flex flex-col flex-1 min-h-0 space-y-4">
           <div>
             <Label>选中的文本</Label>
             <div className="mt-2 p-3 bg-muted rounded-md">
@@ -250,7 +265,7 @@ export function CharacterAnnotationSheet({
           </div>
 
           {!showCreateForm ? (
-            <div className="space-y-4">
+            <div className="flex flex-col flex-1 min-h-0 space-y-4">
               <div className="flex items-center justify-between">
                 <Label>选择角色</Label>
                 <Button
@@ -275,67 +290,126 @@ export function CharacterAnnotationSheet({
                   暂无角色，请先创建角色
                 </div>
               ) : (
-                <div className="space-y-2">
-                  {(matchedCharacters.length > 0 ? matchedCharacters : characters.map(char => ({ character: char, score: 0 }))).map((item) => {
-                    const character = item.character
-                    const isMatched = item.score > 0
-                    const isBestMatch = character.id === bestMatch?.character.id
-                    const aliasPreview = getAliasPreview(character)
-                    
-                    return (
-                      <div
-                        key={character.id}
-                        className={`p-3 border rounded-md hover:bg-muted cursor-pointer transition-colors ${
-                          isBestMatch 
-                            ? "bg-green-50 dark:bg-green-950 border-green-300 dark:border-green-700" 
-                            : isMatched
-                            ? "bg-blue-50 dark:bg-blue-950 border-blue-300 dark:border-blue-700"
-                            : ""
-                        }`}
-                        onClick={() => handleSelectCharacter(character)}
-                      >
-                        <div className="flex items-center justify-between">
-                          <div className="flex-1">
-                            <div className="flex items-center gap-2">
-                              <p className="font-medium">{character.name}</p>
-                              {isBestMatch && (
-                                <Badge variant="default" className="bg-green-600 text-white text-xs">
-                                  最佳匹配
+                <div className="flex flex-col flex-1 min-h-0 space-y-4">
+                  {/* 匹配的角色 */}
+                  {matchedCharacters.length > 0 && (
+                    <div>
+                      <h4 className="text-sm font-medium text-green-700 dark:text-green-300 mb-2">
+                        🎯 匹配的角色 ({matchedCharacters.length})
+                      </h4>
+                      <div className="space-y-2 max-h-60 overflow-y-auto pr-1">
+                        {matchedCharacters.map((item) => {
+                          const character = item.character
+                          const isBestMatch = character.id === bestMatch?.character.id
+                          const aliasPreview = getAliasPreview(character)
+                          
+                          return (
+                            <div
+                              key={character.id}
+                              className={`p-3 border rounded-md hover:bg-muted cursor-pointer transition-colors ${
+                                isBestMatch 
+                                  ? "bg-green-50 dark:bg-green-950 border-green-300 dark:border-green-700" 
+                                  : "bg-blue-50 dark:bg-blue-950 border-blue-300 dark:border-blue-700"
+                              }`}
+                              onClick={() => handleSelectCharacter(character)}
+                            >
+                              <div className="flex items-center justify-between">
+                                <div className="flex-1">
+                                  <div className="flex items-center gap-2">
+                                    <p className="font-medium">{character.name}</p>
+                                    {isBestMatch && (
+                                      <Badge variant="default" className="bg-green-600 text-white text-xs">
+                                        最佳匹配
+                                      </Badge>
+                                    )}
+                                    {!isBestMatch && (
+                                      <Badge variant="secondary" className="bg-blue-600 text-white text-xs">
+                                        匹配
+                                      </Badge>
+                                    )}
+                                  </div>
+                                  {character.description && (
+                                    <p className="text-sm text-muted-foreground mt-1">
+                                      {character.description}
+                                    </p>
+                                  )}
+                                  {character.aliases && character.aliases.length > 0 && (
+                                    <p className="text-xs text-muted-foreground mt-1">
+                                      别名: {character.aliases.join(', ')}
+                                    </p>
+                                  )}
+                                  {aliasPreview && (
+                                    <p className={`text-xs mt-1 ${
+                                      aliasPreview.type === 'new' 
+                                        ? 'text-blue-600 dark:text-blue-400' 
+                                        : 'text-gray-500 dark:text-gray-400'
+                                    }`}>
+                                      💡 {aliasPreview.text}
+                                    </p>
+                                  )}
+                                </div>
+                                <Badge variant={isBestMatch ? "default" : "secondary"}>
+                                  {isBestMatch ? "推荐" : "匹配"}
                                 </Badge>
-                              )}
-                              {isMatched && !isBestMatch && (
-                                <Badge variant="secondary" className="bg-blue-600 text-white text-xs">
-                                  匹配
-                                </Badge>
-                              )}
+                              </div>
                             </div>
-                            {character.description && (
-                              <p className="text-sm text-muted-foreground mt-1">
-                                {character.description}
-                              </p>
-                            )}
-                            {character.aliases && character.aliases.length > 0 && (
-                              <p className="text-xs text-muted-foreground mt-1">
-                                别名: {character.aliases.join(', ')}
-                              </p>
-                            )}
-                            {aliasPreview && (
-                              <p className={`text-xs mt-1 ${
-                                aliasPreview.type === 'new' 
-                                  ? 'text-blue-600 dark:text-blue-400' 
-                                  : 'text-gray-500 dark:text-gray-400'
-                              }`}>
-                                💡 {aliasPreview.text}
-                              </p>
-                            )}
-                          </div>
-                          <Badge variant={isBestMatch ? "default" : isMatched ? "secondary" : "outline"}>
-                            {isBestMatch ? "推荐" : isMatched ? "匹配" : "选择"}
-                          </Badge>
-                        </div>
+                          )
+                        })}
                       </div>
-                    )
-                  })}
+                    </div>
+                  )}
+
+                  {/* 全部未匹配角色，撑满底部并可滚动 */}
+                  <div className="flex flex-col flex-1 min-h-0">
+                    <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                      📋 全部角色（未匹配） ({unmatchedCharacters.length})
+                    </h4>
+                    <div className="space-y-2 flex-1 min-h-0 overflow-y-auto pr-1">
+                      {unmatchedCharacters.length === 0 ? (
+                        <div className="text-muted-foreground text-center py-2">无未匹配角色</div>
+                      ) : (
+                        unmatchedCharacters.map((item) => {
+                          const character = item.character
+                          const aliasPreview = getAliasPreview(character)
+                          return (
+                            <div
+                              key={character.id}
+                              className="p-3 border rounded-md hover:bg-muted cursor-pointer transition-colors"
+                              onClick={() => handleSelectCharacter(character)}
+                            >
+                              <div className="flex items-center justify-between">
+                                <div className="flex-1">
+                                  <div className="flex items-center gap-2">
+                                    <p className="font-medium">{character.name}</p>
+                                  </div>
+                                  {character.description && (
+                                    <p className="text-sm text-muted-foreground mt-1">
+                                      {character.description}
+                                    </p>
+                                  )}
+                                  {character.aliases && character.aliases.length > 0 && (
+                                    <p className="text-xs text-muted-foreground mt-1">
+                                      别名: {character.aliases.join(', ')}
+                                    </p>
+                                  )}
+                                  {aliasPreview && (
+                                    <p className={`text-xs mt-1 ${
+                                      aliasPreview.type === 'new' 
+                                        ? 'text-blue-600 dark:text-blue-400' 
+                                        : 'text-gray-500 dark:text-gray-400'
+                                    }`}>
+                                      💡 {aliasPreview.text}
+                                    </p>
+                                  )}
+                                </div>
+                                <Badge variant="outline">选择</Badge>
+                              </div>
+                            </div>
+                          )
+                        })
+                      )}
+                    </div>
+                  </div>
                 </div>
               )}
             </div>

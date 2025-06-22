@@ -4,6 +4,9 @@ import { useState, useRef, useMemo } from "react"
 import { paragraphSchema } from "@/lib/schemas"
 import { z } from "zod"
 import { CharacterAnnotationSheet } from "@/components/character-annotation-sheet"
+import { getCharacterColor } from "@/lib/utils"
+import { IconX } from "@tabler/icons-react"
+import { toast } from "sonner"
 
 type Paragraph = z.infer<typeof paragraphSchema>
 
@@ -29,6 +32,7 @@ interface ParagraphProps {
   characters: Character[]
   annotations: CharacterAnnotation[]
   onAnnotationCreated: (newAnnotation: CharacterAnnotation, updatedCharacter?: Character) => void
+  onAnnotationDeleted?: (annotationId: number) => void
 }
 
 export function Paragraph({ 
@@ -37,7 +41,8 @@ export function Paragraph({
   bookId, 
   characters, 
   annotations,
-  onAnnotationCreated
+  onAnnotationCreated,
+  onAnnotationDeleted
 }: ParagraphProps) {
   const [selectedText, setSelectedText] = useState("")
   const [showAnnotationSheet, setShowAnnotationSheet] = useState(false)
@@ -238,6 +243,31 @@ export function Paragraph({
     })
   }
 
+  // 删除标注
+  const handleDeleteAnnotation = async (annotationId: number, event: React.MouseEvent) => {
+    event.stopPropagation() // 阻止事件冒泡
+    
+    try {
+      const response = await fetch(`/api/character-annotations?id=${annotationId}`, {
+        method: "DELETE",
+      })
+      
+      if (!response.ok) {
+        const error = await response.json()
+        throw new Error(error.error || "删除标注失败")
+      }
+      
+      // 调用父组件的回调函数更新状态
+      if (onAnnotationDeleted) {
+        onAnnotationDeleted(annotationId)
+      }
+      
+      toast.success("标注删除成功")
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "删除标注失败")
+    }
+  }
+
   // 渲染带标注的文本
   const renderAnnotatedText = () => {
     // 合并已标注和预标注，按位置排序
@@ -265,18 +295,27 @@ export function Paragraph({
 
       // 添加标注的文本
       const isPreAnnotation = 'isPreAnnotation' in annotation && annotation.isPreAnnotation
+      const colorClasses = getCharacterColor(annotation.character.id, isPreAnnotation)
+      
       parts.push(
         <span
           key={`annotation-${isPreAnnotation ? `pre-${annotation.startIndex}` : annotation.id}`}
-          className={`cursor-pointer hover:opacity-80 ${
-            isPreAnnotation 
-              ? "bg-blue-200 dark:bg-blue-800 border border-blue-300 dark:border-blue-600" 
-              : "bg-yellow-200 dark:bg-yellow-800"
-          }`}
+          className={`relative group cursor-pointer hover:opacity-80 ${colorClasses}`}
           title={`${isPreAnnotation ? '预标注 - ' : ''}角色: ${annotation.character.name}`}
           onClick={isPreAnnotation ? () => handlePreAnnotationClick(annotation) : undefined}
         >
           {paragraph.text.slice(annotation.startIndex, annotation.endIndex)}
+          
+          {/* 删除按钮 - 只对已标注的文本显示 */}
+          {!isPreAnnotation && (
+            <button
+              className="absolute -top-1 -right-1 bg-red-500 hover:bg-red-600 text-white rounded-full w-4 h-4 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity text-xs"
+              onClick={(e) => handleDeleteAnnotation(annotation.id, e)}
+              title="删除标注"
+            >
+              <IconX size={10} />
+            </button>
+          )}
         </span>
       )
 

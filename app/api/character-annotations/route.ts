@@ -159,4 +159,43 @@ export async function GET(request: NextRequest) {
       { status: 500 }
     )
   }
+}
+
+export async function DELETE(request: NextRequest) {
+  try {
+    const { searchParams } = new URL(request.url)
+    const annotationId = searchParams.get("id")
+
+    if (!annotationId) {
+      return NextResponse.json(
+        { error: "缺少标注ID" },
+        { status: 400 }
+      )
+    }
+
+    // 验证标注是否存在
+    const annotation = await prisma.characterAnnotation.findUnique({
+      where: { id: parseInt(annotationId) },
+    })
+
+    if (!annotation) {
+      return NextResponse.json(
+        { error: "标注不存在" },
+        { status: 404 }
+      )
+    }
+
+    // 删除标注
+    await prisma.characterAnnotation.delete({
+      where: { id: parseInt(annotationId) },
+    })
+
+    return NextResponse.json({ message: "标注删除成功" })
+  } catch (error) {
+    console.error("删除角色标注失败:", error)
+    return NextResponse.json(
+      { error: "删除角色标注失败" },
+      { status: 500 }
+    )
+  }
 } 

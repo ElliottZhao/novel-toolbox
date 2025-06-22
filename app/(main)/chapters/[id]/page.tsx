@@ -176,6 +176,23 @@ function ChapterContent({ id }: { id: string }) {
     })
   }
 
+  // 删除标注从本地状态
+  const removeAnnotationFromParagraph = (annotationId: number) => {
+    queryClient.setQueryData(["chapter", id], (oldData: ChapterWithDetails | undefined) => {
+      if (!oldData) return oldData
+      
+      return {
+        ...oldData,
+        paragraphs: oldData.paragraphs.map(paragraph => {
+          return {
+            ...paragraph,
+            annotations: paragraph.annotations.filter(annotation => annotation.id !== annotationId)
+          }
+        })
+      }
+    })
+  }
+
   useEffect(() => {
     if (isError) {
       toast.error(`加载章节数据失败: ${(error as Error)?.message}`)
@@ -244,6 +261,7 @@ function ChapterContent({ id }: { id: string }) {
                 updateCharacterAliases(updatedCharacter.id, updatedCharacter.aliases || [])
               }
             }}
+            onAnnotationDeleted={removeAnnotationFromParagraph}
           />
         ))}
       </article>
@@ -257,7 +275,6 @@ function ChapterContent({ id }: { id: string }) {
                 <IconChevronLeft className="h-4 w-4" />
                 <div className="text-left">
                   <div className="text-sm text-muted-foreground">上一章</div>
-                  <div className="font-medium">{navigation.prevChapter.title}</div>
                 </div>
               </Button>
             </Link>
@@ -270,7 +287,6 @@ function ChapterContent({ id }: { id: string }) {
               <Button variant="outline" className="flex items-center gap-2">
                 <div className="text-right">
                   <div className="text-sm text-muted-foreground">下一章</div>
-                  <div className="font-medium">{navigation.nextChapter.title}</div>
                 </div>
                 <IconChevronRight className="h-4 w-4" />
               </Button>
