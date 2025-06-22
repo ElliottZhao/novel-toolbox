@@ -24,6 +24,7 @@ model Book {
   status         BookStatus @default(DRAFT)
   chapters       Chapter[]
   volumes        Volume[]
+  characters     Character[]
   createdAt      DateTime   @default(now())
   updatedAt      DateTime   @updatedAt
 }
@@ -72,6 +73,7 @@ model Paragraph {
   order     Int
   chapterId Int
   chapter   Chapter  @relation(fields: [chapterId], references: [id], onDelete: Cascade)
+  annotations CharacterAnnotation[]
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -106,4 +108,36 @@ enum ChapterStatus {
   EMPTY
   UNANALYZED
   ANALYZED
+}
+
+// 角色模型
+model Character {
+  id          Int       @id @default(autoincrement())
+  name        String
+  description String?
+  aliases     String[]  @default([]) // 角色别名数组
+  bookId      Int
+  book        Book      @relation(fields: [bookId], references: [id], onDelete: Cascade)
+  annotations CharacterAnnotation[]
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@unique([bookId, name])
+}
+
+// 角色标注模型
+model CharacterAnnotation {
+  id          Int       @id @default(autoincrement())
+  startIndex  Int       // 文本在段落中的起始位置
+  endIndex    Int       // 文本在段落中的结束位置
+  selectedText String   // 选中的文本内容
+  characterId Int
+  character   Character @relation(fields: [characterId], references: [id], onDelete: Cascade)
+  paragraphId Int
+  paragraph   Paragraph @relation(fields: [paragraphId], references: [id], onDelete: Cascade)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@index([paragraphId])
+  @@index([characterId])
 }

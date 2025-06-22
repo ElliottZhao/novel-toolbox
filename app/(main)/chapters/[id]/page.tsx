@@ -1,6 +1,6 @@
 "use client"
 
-import { useQuery } from "@tanstack/react-query"
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { useParams, useRouter } from "next/navigation"
 import { z } from "zod"
 import {
@@ -10,16 +10,47 @@ import {
   volumeSchema,
 } from "@/lib/schemas"
 import { Skeleton } from "@/components/ui/skeleton"
+import { Paragraph } from "@/components/paragraph"
 import { useEffect } from "react"
 import { toast } from "sonner"
 
+// 角色schema
+const characterSchema = z.object({
+  id: z.number(),
+  name: z.string(),
+  description: z.string().nullable().optional(),
+  aliases: z.array(z.string()).optional().default([]),
+})
+
+// 角色标注schema
+const characterAnnotationSchema = z.object({
+  id: z.number(),
+  startIndex: z.number(),
+  endIndex: z.number(),
+  selectedText: z.string(),
+  character: characterSchema,
+})
+
+// 扩展的段落schema，包含标注
+const paragraphWithAnnotationsSchema = paragraphSchema.extend({
+  annotations: z.array(characterAnnotationSchema),
+})
+
+// 扩展的书籍schema，包含角色
+const bookWithCharactersSchema = bookSchema.extend({
+  characters: z.array(characterSchema),
+})
+
+// 扩展的章节schema，包含所有详细信息
 const chapterWithDetailsSchema = chapterSchema.extend({
-  book: bookSchema,
+  book: bookWithCharactersSchema,
   volume: volumeSchema,
-  paragraphs: z.array(paragraphSchema),
+  paragraphs: z.array(paragraphWithAnnotationsSchema),
 })
 
 type ChapterWithDetails = z.infer<typeof chapterWithDetailsSchema>
+type Character = z.infer<typeof characterSchema>
+type CharacterAnnotation = z.infer<typeof characterAnnotationSchema>
 
 async function getChapter(id: string): Promise<ChapterWithDetails> {
   const response = await fetch(`/api/chapters/${id}`)
@@ -54,6 +85,8 @@ export default function ChapterDetailPage() {
 }
 
 function ChapterContent({ id }: { id: string }) {
+  const queryClient = useQueryClient()
+  
   const {
     data: chapter,
     isLoading,
@@ -64,6 +97,49 @@ function ChapterContent({ id }: { id: string }) {
     queryFn: () => getChapter(id),
     enabled: !!id,
   })
+
+  // 添加标注到本地状态
+  const addAnnotationToParagraph = (paragraphId: number, newAnnotation: CharacterAnnotation) => {
+    queryClient.setQueryData(["chapter", id], (oldData: ChapterWithDetails | undefined) => {
+      if (!oldData) return oldData
+      
+      return {
+        ...oldData,
+        paragraphs: oldData.paragraphs.map(paragraph => {
+          if (paragraph.id === paragraphId) {
+            return {
+              ...paragraph,
+              annotations: [...paragraph.annotations, newAnnotation]
+            }
+          }
+          return paragraph
+        })
+      }
+    })
+  }
+
+  // 更新角色别名
+  const updateCharacterAliases = (characterId: number, newAliases: string[]) => {
+    queryClient.setQueryData(["chapter", id], (oldData: ChapterWithDetails | undefined) => {
+      if (!oldData) return oldData
+      
+      return {
+        ...oldData,
+        book: {
+          ...oldData.book,
+          characters: oldData.book.characters.map(character => {
+            if (character.id === characterId) {
+              return {
+                ...character,
+                aliases: newAliases
+              }
+            }
+            return character
+          })
+        }
+      }
+    })
+  }
 
   useEffect(() => {
     if (isError) {
@@ -113,7 +189,19 @@ function ChapterContent({ id }: { id: string }) {
 
       <article className="prose prose-stone mx-auto dark:prose-invert max-w-none">
         {chapter.paragraphs.map((p) => (
-          <p key={p.id}>{p.text}</p>
+          <Paragraph 
+            key={p.id} 
+            paragraph={p} 
+            bookId={chapter.book.id}
+            characters={chapter.book.characters}
+            annotations={p.annotations}
+            onAnnotationCreated={(newAnnotation, updatedCharacter) => {
+              addAnnotationToParagraph(p.id, newAnnotation)
+              if (updatedCharacter) {
+                updateCharacterAliases(updatedCharacter.id, updatedCharacter.aliases || [])
+              }
+            }}
+          />
         ))}
       </article>
     </div>

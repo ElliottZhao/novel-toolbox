@@ -15,11 +15,29 @@ export async function GET(
     const chapter = await prisma.chapter.findUnique({
       where: { id: chapterId },
       include: {
-        book: true,
+        book: {
+          include: {
+            characters: {
+              orderBy: {
+                name: "asc",
+              },
+            },
+          },
+        },
         volume: true,
         paragraphs: {
           orderBy: {
             order: "asc",
+          },
+          include: {
+            annotations: {
+              include: {
+                character: true,
+              },
+              orderBy: {
+                startIndex: "asc",
+              },
+            },
           },
         },
       },

@@ -244,7 +244,7 @@ export function ChaptersDataTable({ bookId }: { bookId?: number }) {
         downloadMutation.isPending,
         downloadMutation.variables,
       ),
-    [downloadMutation.isPending, downloadMutation.variables],
+    [downloadMutation.isPending, downloadMutation.variables, downloadMutation.mutate],
   )
 
   const { data = [], isLoading } = useQuery({
