@@ -1,6 +1,6 @@
 "use client"
 
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
+import { useQuery, useQueryClient } from "@tanstack/react-query"
 import { useParams, useRouter } from "next/navigation"
 import { z } from "zod"
 import {
@@ -13,6 +13,9 @@ import { Skeleton } from "@/components/ui/skeleton"
 import { Paragraph } from "@/components/paragraph"
 import { useEffect } from "react"
 import { toast } from "sonner"
+import { Button } from "@/components/ui/button"
+import { IconChevronLeft, IconChevronRight } from "@tabler/icons-react"
+import Link from "next/link"
 
 // 角色schema
 const characterSchema = z.object({
@@ -49,8 +52,23 @@ const chapterWithDetailsSchema = chapterSchema.extend({
 })
 
 type ChapterWithDetails = z.infer<typeof chapterWithDetailsSchema>
-type Character = z.infer<typeof characterSchema>
 type CharacterAnnotation = z.infer<typeof characterAnnotationSchema>
+
+// 导航章节schema
+const navigationChapterSchema = z.object({
+  id: z.number(),
+  title: z.string(),
+  volume: volumeSchema,
+  book: bookSchema,
+})
+
+// 导航数据schema
+const navigationDataSchema = z.object({
+  prevChapter: navigationChapterSchema.nullable(),
+  nextChapter: navigationChapterSchema.nullable(),
+})
+
+type NavigationData = z.infer<typeof navigationDataSchema>
 
 async function getChapter(id: string): Promise<ChapterWithDetails> {
   const response = await fetch(`/api/chapters/${id}`)
@@ -59,6 +77,15 @@ async function getChapter(id: string): Promise<ChapterWithDetails> {
   }
   const data = await response.json()
   return chapterWithDetailsSchema.parse(data)
+}
+
+async function getChapterNavigation(id: string): Promise<NavigationData> {
+  const response = await fetch(`/api/chapters/${id}/navigation`)
+  if (!response.ok) {
+    throw new Error("Network response was not ok")
+  }
+  const data = await response.json()
+  return navigationDataSchema.parse(data)
 }
 
 export default function ChapterDetailPage() {
@@ -95,6 +122,14 @@ function ChapterContent({ id }: { id: string }) {
   } = useQuery({
     queryKey: ["chapter", id],
     queryFn: () => getChapter(id),
+    enabled: !!id,
+  })
+
+  const {
+    data: navigation,
+  } = useQuery({
+    queryKey: ["chapter-navigation", id],
+    queryFn: () => getChapterNavigation(id),
     enabled: !!id,
   })
 
@@ -196,7 +231,15 @@ function ChapterContent({ id }: { id: string }) {
             characters={chapter.book.characters}
             annotations={p.annotations}
             onAnnotationCreated={(newAnnotation, updatedCharacter) => {
-              addAnnotationToParagraph(p.id, newAnnotation)
+              // 确保aliases是数组类型
+              const annotationWithFixedAliases = {
+                ...newAnnotation,
+                character: {
+                  ...newAnnotation.character,
+                  aliases: newAnnotation.character.aliases || []
+                }
+              }
+              addAnnotationToParagraph(p.id, annotationWithFixedAliases)
               if (updatedCharacter) {
                 updateCharacterAliases(updatedCharacter.id, updatedCharacter.aliases || [])
               }
@@ -204,6 +247,37 @@ function ChapterContent({ id }: { id: string }) {
           />
         ))}
       </article>
+
+      {/* 章节导航 */}
+      <div className="mt-12 flex items-center justify-between border-t pt-8">
+        <div className="flex-1">
+          {navigation?.prevChapter && (
+            <Link href={`/chapters/${navigation.prevChapter.id}`}>
+              <Button variant="outline" className="flex items-center gap-2">
+                <IconChevronLeft className="h-4 w-4" />
+                <div className="text-left">
+                  <div className="text-sm text-muted-foreground">上一章</div>
+                  <div className="font-medium">{navigation.prevChapter.title}</div>
+                </div>
+              </Button>
+            </Link>
+          )}
+        </div>
+        
+        <div className="flex-1 flex justify-end">
+          {navigation?.nextChapter && (
+            <Link href={`/chapters/${navigation.nextChapter.id}`}>
+              <Button variant="outline" className="flex items-center gap-2">
+                <div className="text-right">
+                  <div className="text-sm text-muted-foreground">下一章</div>
+                  <div className="font-medium">{navigation.nextChapter.title}</div>
+                </div>
+                <IconChevronRight className="h-4 w-4" />
+              </Button>
+            </Link>
+          )}
+        </div>
+      </div>
     </div>
   )
 } 

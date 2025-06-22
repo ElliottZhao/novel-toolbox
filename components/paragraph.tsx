@@ -67,41 +67,63 @@ export function Paragraph({
     // 为每个角色查找匹配的文本（包括别名）
     characters.forEach(character => {
       const searchTerms = [character.name, ...(character.aliases || [])]
+        .filter(term => term.trim()) // 过滤空字符串
+        .sort((a, b) => b.length - a.length) // 按长度降序排列，优先匹配更长的文本
+      
+      // 记录已匹配的位置，避免重叠
+      const matchedPositions: Array<{start: number, end: number}> = []
       
       searchTerms.forEach(searchTerm => {
         if (!searchTerm.trim()) return
         
-        let searchIndex = 0
+        // 从后向前搜索，实现后向优先
+        let searchIndex = paragraph.text.length
         
-        while (true) {
-          const index = paragraph.text.indexOf(searchTerm, searchIndex)
-          if (index === -1) break
+        while (searchIndex > 0) {
+          // 从当前位置向前查找
+          const lastIndex = paragraph.text.lastIndexOf(searchTerm, searchIndex - 1)
+          if (lastIndex === -1) break
           
-          const endIndex = index + searchTerm.length
+          const endIndex = lastIndex + searchTerm.length
           
           // 检查是否与已有标注重叠
-          const isOverlapping = annotatedRanges.some(range => 
-            (index >= range.start && index < range.end) ||
+          const isOverlappingWithAnnotations = annotatedRanges.some(range => 
+            (lastIndex >= range.start && lastIndex < range.end) ||
             (endIndex > range.start && endIndex <= range.end) ||
-            (index <= range.start && endIndex >= range.end)
+            (lastIndex <= range.start && endIndex >= range.end)
           )
           
-          if (!isOverlapping) {
+          // 检查是否与已匹配的位置重叠
+          const isOverlappingWithMatched = matchedPositions.some(pos => 
+            (lastIndex >= pos.start && lastIndex < pos.end) ||
+            (endIndex > pos.start && endIndex <= pos.end) ||
+            (lastIndex <= pos.start && endIndex >= pos.end)
+          )
+          
+          if (!isOverlappingWithAnnotations && !isOverlappingWithMatched) {
             preAnnotated.push({
-              startIndex: index,
+              startIndex: lastIndex,
               endIndex: endIndex,
               text: searchTerm,
               character: character,
               isPreAnnotation: true
             })
+            
+            // 记录已匹配的位置
+            matchedPositions.push({
+              start: lastIndex,
+              end: endIndex
+            })
           }
           
-          searchIndex = endIndex
+          // 继续向前搜索
+          searchIndex = lastIndex
         }
       })
     })
 
-    return preAnnotated
+    // 按位置排序，确保渲染顺序正确
+    return preAnnotated.sort((a, b) => a.startIndex - b.startIndex)
   }, [paragraph.text, characters, annotations])
 
   // 处理文本选择
