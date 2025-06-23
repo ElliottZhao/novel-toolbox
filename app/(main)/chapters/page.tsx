@@ -15,7 +15,7 @@ export default async function ChaptersPage({
           <p className="text-muted-foreground">浏览和管理所有章节。</p>
         </div>
       </div>
-      <ChaptersDataTable bookId={bookId ? Number(bookId) : undefined} />
+      <ChaptersDataTable bookId={bookId} />
     </div>
   )
 } 

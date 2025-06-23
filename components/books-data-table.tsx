@@ -9,7 +9,6 @@ import {
   IconChevronsRight,
   IconLayoutColumns,
   IconLoader,
-  IconPlus,
 } from "@tabler/icons-react"
 import {
   ColumnFiltersState,
@@ -55,7 +54,6 @@ import {
 } from "@/components/ui/table"
 import {
   Tabs,
-  TabsContent,
   TabsList,
   TabsTrigger,
 } from "@/components/ui/tabs"

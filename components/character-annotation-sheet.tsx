@@ -105,8 +105,6 @@ export function CharacterAnnotationSheet({
     .filter(item => item.score > 0)
     .sort((a, b) => b.score - a.score)
 
-  const bestMatch = matchedCharacters[0]
-
   // 获取未匹配的角色
   const unmatchedCharacters = characters
     .filter(character => !matchedCharacters.some(matched => matched.character.id === character.id))

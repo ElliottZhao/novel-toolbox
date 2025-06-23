@@ -1,7 +1,8 @@
 "use client";
 
 import * as React from "react";
-import { IconBook, IconBookFilled, IconFile, IconListDetails } from "@tabler/icons-react";
+import { IconBook, IconBookFilled, IconListDetails } from "@tabler/icons-react";
+import Link from "next/link";
 
 import { NavMain } from "@/components/nav-main";
 import {
@@ -25,11 +26,6 @@ const data = {
       url: "/chapters",
       icon: IconListDetails,
     },
-    {
-      title: "任务队列",
-      url: "/tasks",
-      icon: IconFile,
-    }
   ],
 };
 
@@ -43,10 +39,10 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
               asChild
               className="data-[slot=sidebar-menu-button]:!p-1.5"
             >
-              <a href="/">
+              <Link href="/">
                 <IconBookFilled className="!size-5" />
                 <span className="text-base font-semibold">Novel Toolbox</span>
-              </a>
+              </Link>
             </SidebarMenuButton>
           </SidebarMenuItem>
         </SidebarMenu>

@@ -105,8 +105,7 @@ novel-toolbox/
 ├── app/                    # Next.js App Router
 │   ├── (main)/            # 主应用路由
 │   │   ├── books/         # 书籍管理页面
-│   │   ├── chapters/      # 章节管理页面
-│   │   └── tasks/         # 任务管理页面
+│   │   └── chapters/      # 章节管理页面
 │   └── api/               # API路由
 │       ├── books/         # 书籍API
 │       ├── chapters/      # 章节API
